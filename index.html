@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Clock &amp; Weather</title>
+
+  <!-- PWA / iOS meta -->
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Clock">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-180.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- Weather FX backdrop (dynamic display mode). Behind everything, never blocks input. -->
+  <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+
+  <!-- Always-present dim layer (pointer-events:none) -->
+  <div class="dim" id="dim" aria-hidden="true"></div>
+
+  <main class="app" id="app">
+    <!-- WEATHER region -->
+    <section class="weather" id="weather" aria-label="Local weather">
+      <div class="wx-empty" id="wxEmpty">Loading weather…</div>
+      <div class="wx-card" id="wxCard" hidden>
+        <div class="wx-top">
+          <span class="wx-icon" id="wxIcon" aria-hidden="true">·</span>
+          <span class="wx-temp" id="wxTemp">--°</span>
+        </div>
+        <div class="wx-cond" id="wxCond">—</div>
+        <div class="wx-meta">
+          <span id="wxFeels">Feels --°</span>
+          <span id="wxHiLo">H --° L --°</span>
+        </div>
+        <div class="wx-sun" id="wxSun" aria-label="Sun position" hidden></div>
+        <div class="wx-place" id="wxPlace"></div>
+        <div class="wx-stale" id="wxStale" hidden></div>
+      </div>
+    </section>
+
+    <!-- STAGE region (clock fills its CELL) -->
+    <section class="stage" id="stage" aria-label="Clock"></section>
+
+    <!-- CHROME region (controls band, always reserved, fades) -->
+    <nav class="chrome" id="chrome" aria-label="Controls">
+      <button class="ctrl" id="btnMode" type="button" data-nav>Analog</button>
+      <button class="ctrl" id="btnDim" type="button" data-nav>Dim</button>
+      <button class="ctrl" id="btnGear" type="button" data-nav aria-haspopup="dialog">Settings</button>
+    </nav>
+  </main>
+
+  <!-- OVERLAYS: settings panel (display:none when closed → zero layout space) -->
+  <div class="panel" id="panel" role="dialog" aria-modal="true" aria-label="Settings" aria-hidden="true">
+    <div class="panel-box">
+      <h2 class="panel-title">Settings</h2>
+
+      <div class="row">
+        <span class="row-label">Clock</span>
+        <button class="ctrl" id="setMode" type="button" data-nav>Digital</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Style</span>
+        <button class="ctrl" id="setStyle" type="button" data-nav>Classic</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Orientation</span>
+        <button class="ctrl" id="setOrient" type="button" data-nav>Auto</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Display</span>
+        <button class="ctrl" id="setDisplay" type="button" data-nav>Plain</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Sun arc</span>
+        <button class="ctrl" id="setSun" type="button" data-nav>On</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Hour format</span>
+        <button class="ctrl" id="setHour" type="button" data-nav>12h</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Seconds</span>
+        <button class="ctrl" id="setSeconds" type="button" data-nav>On</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Date</span>
+        <button class="ctrl" id="setDate" type="button" data-nav>On</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Night dim</span>
+        <button class="ctrl" id="setNight" type="button" data-nav>Off</button>
+      </div>
+
+      <div class="row row-col">
+        <label class="row-label" for="setCity">City search</label>
+        <div class="city-wrap">
+          <input class="city-input" id="setCity" type="text" inputmode="search"
+                 placeholder="City name (touch only)" data-nav autocomplete="off">
+          <button class="ctrl" id="setCityGo" type="button" data-nav>Find</button>
+        </div>
+        <div class="city-status" id="cityStatus" aria-live="polite"></div>
+      </div>
+
+      <div class="row row-end">
+        <button class="ctrl" id="setGeo" type="button" data-nav>Use my location</button>
+        <button class="ctrl ctrl-primary" id="setClose" type="button" data-nav>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden video fallback for wake-lock (phone only; created/used by wakelock.js) -->
+  <video class="wl-video" id="wlVideo" playsinline muted loop disablepictureinpicture
+         aria-hidden="true" tabindex="-1"></video>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
