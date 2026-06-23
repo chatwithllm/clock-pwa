@@ -229,6 +229,25 @@ function syncDimButton(){
   $('btnDim').textContent = app.deepDim ? 'Undim' : 'Dim';
 }
 
+// Reflect wake-lock state in the chrome-band indicator. Hidden where it doesn't
+// apply (TV / unsupported); green "Awake" when held, amber when the screen may sleep.
+function updateWakeIndicator(status){
+  try {
+    const el = $('wlStatus'); if (!el) return;
+    const dot = $('wlText');
+    el.classList.remove('is-on','is-off');
+    if (status === 'lock' || status === 'video'){
+      el.hidden = false; el.classList.add('is-on'); dot.textContent = 'Awake';
+      el.title = status === 'video' ? 'Keeping screen awake (video fallback)' : 'Screen wake lock active';
+    } else if (status === 'off'){
+      el.hidden = false; el.classList.add('is-off'); dot.textContent = 'May sleep';
+      el.title = 'Wake lock not held — needs HTTPS and the page in foreground';
+    } else {
+      el.hidden = true;  // 'na' (TV) or 'unsupported'
+    }
+  } catch(_){}
+}
+
 function persist(){ try { saveSettings(app.settings); } catch(_){} }
 
 function applyClockOptions(){
@@ -410,10 +429,11 @@ async function boot(){
   wireInput();
   syncButtons();
 
-  // Wake lock (phone only; no-op on TV).
+  // Wake lock (phone only; no-op on TV) + on-screen status indicator.
   try {
     app.wake = new WakeKeeper({ isTV: app.isTV, video: $('wlVideo') });
-    if (app.wake.supported) app.wake.enable();
+    app.wake.onStatus(updateWakeIndicator);
+    app.wake.enable();
   } catch(_){}
 
   startPixelShift();

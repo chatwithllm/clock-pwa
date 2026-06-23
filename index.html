@@ -48,6 +48,9 @@
 
     <!-- CHROME region (controls band, always reserved, fades) -->
     <nav class="chrome" id="chrome" aria-label="Controls">
+      <span class="wl-status" id="wlStatus" role="status" aria-live="polite" hidden>
+        <span class="wl-dot" id="wlDot" aria-hidden="true"></span><span class="wl-text" id="wlText"></span>
+      </span>
       <button class="ctrl" id="btnMode" type="button" data-nav>Analog</button>
       <button class="ctrl" id="btnDim" type="button" data-nav>Dim</button>
       <button class="ctrl" id="btnGear" type="button" data-nav aria-haspopup="dialog">Settings</button>

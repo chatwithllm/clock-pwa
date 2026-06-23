@@ -9,8 +9,15 @@ export class WakeKeeper {
     this._lock = null;
     this._usingVideo = false;
     this._enabled = false;
+    this._status = 'off';     // 'lock' | 'video' | 'off' | 'na' | 'unsupported'
+    this._onStatus = null;
     this._onVis = () => this._reacquire();
   }
+
+  // Subscribe to status changes (for an on-screen indicator). Fires immediately.
+  onStatus(cb){ this._onStatus = (typeof cb === 'function') ? cb : null; if (this._onStatus) this._onStatus(this._status); }
+  getStatus(){ return this._status; }
+  _setStatus(s){ if (s === this._status) return; this._status = s; if (this._onStatus) { try { this._onStatus(s); } catch(_){} } }
 
   get supported(){
     return !this.isTV && (this._hasWakeLock() || !!this.video);
@@ -21,7 +28,8 @@ export class WakeKeeper {
   }
 
   async enable(){
-    if (this.isTV) return false;          // TV: no video hack, no-op
+    if (this.isTV){ this._setStatus('na'); return false; }   // TV: no video hack, no-op
+    if (!this.supported){ this._setStatus('unsupported'); return false; }
     this._enabled = true;
     document.addEventListener('visibilitychange', this._onVis);
     return this._acquire();
@@ -32,8 +40,11 @@ export class WakeKeeper {
     if (this._hasWakeLock()){
       try {
         this._lock = await navigator.wakeLock.request('screen');
-        this._lock.addEventListener && this._lock.addEventListener('release', () => { this._lock = null; });
+        this._lock.addEventListener && this._lock.addEventListener('release', () => {
+          this._lock = null; if (this._enabled) this._setStatus('off');  // system released it
+        });
         this._usingVideo = false;
+        this._setStatus('lock');
         return true;
       } catch(_) { /* fall through to video */ }
     }
@@ -41,7 +52,7 @@ export class WakeKeeper {
   }
 
   _startVideo(){
-    if (!this.video) return false;
+    if (!this.video){ this._setStatus('off'); return false; }
     try {
       // 1x1 silent black looping clip generated at runtime — no asset dependency.
       if (!this.video.src){
@@ -51,8 +62,9 @@ export class WakeKeeper {
       const p = this.video.play();
       if (p && typeof p.catch === 'function') p.catch(()=>{});
       this._usingVideo = true;
+      this._setStatus('video');
       return true;
-    } catch(_) { return false; }
+    } catch(_) { this._setStatus('off'); return false; }
   }
 
   async _reacquire(){
@@ -71,6 +83,7 @@ export class WakeKeeper {
     if (this._lock){ try { await this._lock.release(); } catch(_){} this._lock = null; }
     if (this._usingVideo && this.video){ try { this.video.pause(); } catch(_){} }
     this._usingVideo = false;
+    this._setStatus('off');
   }
 }
 

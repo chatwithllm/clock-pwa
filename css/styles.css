@@ -218,6 +218,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   .sunarc-core{animation:none}
 }
 
+/* Wake-lock status indicator (lives in the chrome band; shows when chrome is visible) */
+.wl-status{display:inline-flex;align-items:center;gap:.45em;font:inherit;
+  font-size:clamp(11px,2vmin,15px);color:var(--fg-dim);letter-spacing:.02em;
+  padding-right:clamp(4px,1.5vmin,12px)}
+.wl-dot{width:.62em;height:.62em;border-radius:50%;background:#6b6f78;flex:0 0 auto;
+  box-shadow:0 0 0 0 rgba(0,0,0,0)}
+.wl-status.is-on .wl-dot{background:#43d17a;box-shadow:0 0 6px rgba(67,209,122,.6)}
+.wl-status.is-off .wl-dot{background:#d9883a}
+.wl-status.is-on{color:#9fe7bd}
+.wl-status.is-off{color:#d9a06a}
+
 /* Controls */
 .ctrl{
   font:inherit;font-size:clamp(13px,2.6vmin,20px);color:var(--fg);
