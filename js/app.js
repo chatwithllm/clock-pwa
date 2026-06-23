@@ -358,11 +358,11 @@ async function detectTV(){
 function registerSW(){
   if (!('serviceWorker' in navigator)) return;
   // Only registers over https/localhost; silently skipped on plain http LAN IP.
-  try {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(()=>{});
-    });
-  } catch(_) {}
+  const reg = () => { try { navigator.serviceWorker.register('sw.js').catch(()=>{}); } catch(_){} };
+  // ES modules are deferred, so the window 'load' event may have ALREADY fired by
+  // the time we run — register now in that case, else wait for load.
+  if (document.readyState === 'complete') reg();
+  else window.addEventListener('load', reg);
 }
 
 // ---------- Boot ----------

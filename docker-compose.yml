@@ -1,0 +1,8 @@
+services:
+  clock:
+    build: .
+    image: clock-pwa
+    container_name: clock-pwa
+    ports:
+      - "8080:80"     # open http://localhost:8080
+    restart: unless-stopped

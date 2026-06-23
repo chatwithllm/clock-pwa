@@ -16,6 +16,30 @@ Both orientations, any screen **320px → 4K**, with **zero element overlap, eve
 
 ---
 
+## Quick start (Docker)
+
+The repo ships a tiny nginx image (no build step inside — it just serves the static files):
+
+```bash
+git clone https://github.com/chatwithllm/clock-pwa.git
+cd clock-pwa
+docker compose up -d          # or: docker build -t clock-pwa . && docker run -d -p 8080:80 clock-pwa
+```
+
+Then open **http://localhost:8080**.
+
+**One-click install:** because `localhost` is a secure context, the service worker registers
+and Chrome/Edge show an **install icon** in the address bar — click it to install the PWA (or
+on a phone over real HTTPS, *Add to Home Screen*). The nginx config serves the manifest with the
+correct MIME type and keeps `sw.js` uncached so updates ship.
+
+> To install from another device on your LAN (a phone) you still need **HTTPS** on the LAN IP —
+> see *Hosting over LAN HTTPS* below. Put nginx/Caddy in front of this container for TLS, or use
+> the cert recipe in that section. Over plain `http://<LAN-IP>` the clock + weather work but the
+> service worker / install are blocked by the browser.
+
+---
+
 ## Support floor (baseline)
 
 Targeted floor: **iOS Safari 13.4+**, **Android 7+ WebView**, **Tizen**, **Fire TV Silk**.

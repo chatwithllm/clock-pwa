@@ -1,0 +1,10 @@
+.git
+.gitignore
+README.md
+Dockerfile
+docker-compose.yml
+.dockerignore
+.playwright-mcp
+scratchpad
+*.log
+*.png.bak
