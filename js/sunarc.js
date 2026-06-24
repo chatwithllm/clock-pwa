@@ -138,13 +138,16 @@ export class SunArc {
     const p = Math.max(0, Math.min(1, raw));
     const isNight = raw < 0 || raw > 1;
 
-    // At night the dome conveys nothing, so collapse it to a single "next sunrise"
-    // line in BOTH orientations (frees the wasted space). Day keeps the full arc.
-    const compact = isNight;
+    // Collapse the dome to a single contextual line when it's night (useless after
+    // dark) OR when the caller prefers compact (landscape footer strip can't fit a
+    // dome). Day-portrait keeps the full arc. Next event: day→sunset, night→sunrise.
+    const compact = isNight || !!data.preferCompact;
     this.svg.classList.toggle('is-compact', compact);
     if (compact){
       this.svg.setAttribute('viewBox', '0 0 200 30');
-      this.compact.textContent = '☾  Sunrise ' + this._fmt(rise);
+      this.compact.textContent = isNight
+        ? '☾  Sunrise ' + this._fmt(rise)
+        : '☀  Sunset ' + this._fmt(set);
       return;
     }
     this.svg.setAttribute('viewBox', `0 0 ${VBW} ${VBH}`);

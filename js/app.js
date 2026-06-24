@@ -229,8 +229,10 @@ function updateSun(){
     if (!app.sun) return;
     if (!app.settings.sunArc){ app.sun.hide(); return; } // gated by the Sun-arc setting
     const w = app.lastWeather;
-    if (w && w.sunrise && w.sunset) app.sun.update({ sunrise: w.sunrise, sunset: w.sunset, portrait: isEffectivePortrait() });
-    else app.sun.hide();
+    if (w && w.sunrise && w.sunset){
+      // Landscape uses the footer strip → always compact; portrait keeps the dome by day.
+      app.sun.update({ sunrise: w.sunrise, sunset: w.sunset, preferCompact: !isEffectivePortrait() });
+    } else app.sun.hide();
   } catch(_){}
 }
 

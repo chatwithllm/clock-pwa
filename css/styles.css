@@ -73,11 +73,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
     grid-template-areas:"weather" "stage" "chrome";
   }
 }
+/* Landscape = clock HERO (full width, centered) + weather as a footer strip */
 @media (orientation:landscape){
   .app{
-    grid-template-columns:clamp(180px,26vw,340px) 1fr;
-    grid-template-rows:minmax(0,1fr) var(--chrome-band);
-    grid-template-areas:"weather stage" "weather chrome";
+    grid-template-columns:1fr;
+    grid-template-rows:minmax(0,1fr) auto var(--chrome-band);
+    grid-template-areas:"stage" "weather" "chrome";
   }
 }
 
@@ -89,18 +90,39 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   grid-template-areas:"weather" "stage" "chrome";
 }
 .app.force-landscape{
-  grid-template-columns:clamp(180px,26vw,340px) 1fr;
-  grid-template-rows:minmax(0,1fr) var(--chrome-band);
-  grid-template-areas:"weather stage" "weather chrome";
+  grid-template-columns:1fr;
+  grid-template-rows:minmax(0,1fr) auto var(--chrome-band);
+  grid-template-areas:"stage" "weather" "chrome";
 }
 
 /* ---- Regions ---- */
 .stage{grid-area:stage;min-width:0;min-height:0;display:grid;place-items:center;
   padding:clamp(4px,2.4vmin,40px)} /* min:0 lets it shrink below content; padding gives the clock air */
 .weather{grid-area:weather;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:flex-start}
+
+/* Landscape: weather lays out as a centered horizontal footer strip.
+   Selectors are parent-scoped (.weather …) so they beat the base .wx-card
+   column rule that appears later in this file. */
 @media (orientation:landscape){
-  .weather{align-items:center} /* vertically balanced rail card on wide screens */
+  .weather{align-items:center;justify-content:center}
+  .weather .wx-card{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;
+    column-gap:clamp(12px,2.6vw,40px);row-gap:clamp(2px,1vh,10px);width:auto;max-width:100%}
+  .weather .wx-place{order:0}
+  .weather .wx-top{order:1}
+  .weather .wx-cond{order:2}
+  .weather .wx-meta{order:3;border:0;padding:0}
+  .weather .wx-sun{order:4;width:auto;margin:0}
+  .weather .sunarc-svg{height:clamp(16px,3.4vh,28px);width:auto;max-width:none}
 }
+.app.force-landscape .weather{align-items:center;justify-content:center}
+.app.force-landscape .wx-card{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;
+  column-gap:clamp(12px,2.6vw,40px);row-gap:clamp(2px,1vh,10px);width:auto;max-width:100%}
+.app.force-landscape .wx-place{order:0}
+.app.force-landscape .wx-top{order:1}
+.app.force-landscape .wx-cond{order:2}
+.app.force-landscape .wx-meta{order:3;border:0;padding:0}
+.app.force-landscape .wx-sun{order:4;width:auto;margin:0}
+.app.force-landscape .sunarc-svg{height:clamp(16px,3.4vh,28px);width:auto;max-width:none}
 .chrome{
   grid-area:chrome;min-width:0;display:flex;align-items:center;justify-content:center;
   gap:clamp(8px,3vmin,32px);opacity:0;pointer-events:none;transition:opacity .4s ease; /* band ALWAYS reserved */
