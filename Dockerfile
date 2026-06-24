@@ -1,8 +1,9 @@
 # Static clock+weather PWA served by nginx. No build step — just the app files.
 FROM nginx:1.27-alpine
 
-# curl for the server-side weather fetcher (reliable HTTPS vs busybox wget)
-RUN apk add --no-cache curl
+# curl for the server-side weather fetcher (reliable HTTPS vs busybox wget);
+# apache2-utils for htpasswd (admin basic-auth)
+RUN apk add --no-cache curl apache2-utils
 
 # nginx site config (manifest mime, service-worker no-cache, gzip)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
@@ -22,10 +23,13 @@ COPY css   /usr/share/nginx/html/css
 COPY js    /usr/share/nginx/html/js
 COPY icons /usr/share/nginx/html/icons
 
-# Startup scripts: write config.json from env, and start the server weather fetcher.
+# Startup scripts: admin basic-auth, config.json from env, server weather fetcher.
+COPY docker-entrypoint.d/10-admin-auth.sh    /docker-entrypoint.d/10-admin-auth.sh
 COPY docker-entrypoint.d/30-clock-config.sh  /docker-entrypoint.d/30-clock-config.sh
 COPY docker-entrypoint.d/40-weather-fetch.sh /docker-entrypoint.d/40-weather-fetch.sh
-RUN chmod +x /docker-entrypoint.d/30-clock-config.sh /docker-entrypoint.d/40-weather-fetch.sh
+RUN chmod +x /docker-entrypoint.d/10-admin-auth.sh /docker-entrypoint.d/30-clock-config.sh /docker-entrypoint.d/40-weather-fetch.sh
+# Ensure the auth include exists even before the entrypoint runs (nginx -t safety).
+RUN : > /etc/nginx/admin_auth.conf
 
 EXPOSE 80
 # nginx:alpine already runs `nginx -g 'daemon off;'` as CMD
