@@ -20,8 +20,21 @@ fi
 # Escape backslashes and double quotes for JSON.
 esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 NOW=$(date +%s)
+F="$ROOT/announce.json"
 
-printf '{ "id": "%s", "text": "%s", "ts": %s000, "duration": %s, "target": "%s" }\n' \
-  "$NOW-$$" "$(esc "$TEXT")" "$NOW" "$DUR" "$(esc "$TARGET")" > "$ROOT/announce.json"
+ELEM=$(printf '{ "id": "%s", "text": "%s", "ts": %s000, "duration": %s, "target": "%s" }' \
+  "$NOW-$$" "$(esc "$TEXT")" "$NOW" "$DUR" "$(esc "$TARGET")")
+
+CUR=$(cat "$F" 2>/dev/null)
+case "$CUR" in
+  \[*\]) : ;;          # already a JSON array
+  *) CUR="[]" ;;        # missing/empty/legacy-object -> start fresh
+esac
+INNER=$(printf '%s' "$CUR" | sed 's/^[[:space:]]*\[//; s/\][[:space:]]*$//')
+if printf '%s' "$INNER" | grep -q '[^[:space:]]'; then
+  printf '[%s,%s]\n' "$INNER" "$ELEM" > "$F"
+else
+  printf '[%s]\n' "$ELEM" > "$F"
+fi
 
 echo "announced to '$TARGET' for ${DUR}s: $TEXT"

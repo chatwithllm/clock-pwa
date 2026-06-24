@@ -160,6 +160,27 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .announce-sub{margin-top:.35em;font-size:clamp(12px,2.4vmin,18px);color:var(--fg-dim);letter-spacing:.04em}
 .announce-close{flex:0 0 auto;white-space:nowrap}
 
+/* ---- Right-side notification stack (2+ live announcements) ---- */
+.announce-stack{position:fixed;top:var(--safe-top);right:var(--safe-right);z-index:31;
+  display:flex;flex-direction:column;gap:10px;max-width:min(360px,42vw);pointer-events:none}
+.announce-stack[hidden]{display:none}
+.toast{display:flex;align-items:flex-start;gap:10px;
+  background:linear-gradient(180deg,#1b2230,#13171f);border:1px solid var(--bd,#2a2f3a);
+  border-radius:12px;padding:10px 14px;box-shadow:0 6px 24px rgba(0,0,0,.5);
+  color:var(--fg);animation:toastIn .2s ease}
+.toast-icon{font-size:20px;line-height:1.2;flex:0 0 auto}
+.toast-text{font-size:15px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.toast-sub{display:block;margin-top:2px;font-size:12px;font-weight:500;color:var(--fg-dim);letter-spacing:.03em}
+.toast-more{justify-content:center;font-size:13px;color:var(--fg-dim);font-weight:600}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+/* Card mode: center announcement goes non-modal (no dim backdrop) when 2+ live */
+.announce.announce--card{background:transparent;place-items:start center;pointer-events:none}
+.announce.announce--card .announce-box{pointer-events:auto;margin-top:8vh;animation:toastIn .2s ease}
+.announce.announce--card .announce-close{font-size:13px;padding:6px 12px}
+@media (prefers-reduced-motion: reduce){
+  .toast,.announce.announce--card .announce-box{animation:none}
+}
+
 /* ============================================================
    Styling on top of the shell
    ============================================================ */

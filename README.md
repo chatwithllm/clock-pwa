@@ -63,8 +63,15 @@ is **announcements**.
 
 **Broadcast a message** the easy way — the **admin page** at **`http://<host>:8080/admin.html`**:
 type a message, pick a target (All or a room), duration, optional icon, and hit *Send*. Every device
-polls every ~15 s and shows it as a banner (dismissable by tap / Enter / Escape, auto-hiding after
-the duration). A display only shows messages targeted to `all` or **its own profile**.
+polls every ~15 s; a display only shows messages targeted to `all` or **its own profile**.
+Announcements are now a **queue**: a single live message shows centered as a dimmed modal (dismissable
+by tap / Enter / Escape, auto-hiding after its duration), exactly as before. When two or more live
+messages are queued, the newest appears centered as a card while the rest stack in a top-right
+notification tray (Apple-style), oldest at the top, each auto-dismissing on its own duration;
+the tray is capped at 4 visible items and shows a **+N more** chip for any overflow. Sends via the
+admin page append entries to `announce.json` (a JSON array); **Clear all** empties it for every
+device within the next poll cycle. Dismissing a message on a display is local to that device (it
+stays hidden there for the rest of its duration); other displays keep showing it until it expires.
 
 Under the hood the admin page `PUT`s `announce.json` via nginx WebDAV — no extra backend. The CLI
 helper does the same:

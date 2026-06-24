@@ -151,6 +151,8 @@
       <button class="ctrl ctrl-primary announce-close" id="announceClose" type="button" data-nav>Dismiss</button>
     </div>
   </div>
+  <!-- Stacked announcement toasts (shown when 2+ are live) -->
+  <div class="announce-stack" id="announceStack" aria-live="polite" hidden></div>
 
   <!-- Hidden video fallback for wake-lock (phone only; created/used by wakelock.js) -->
   <video class="wl-video" id="wlVideo" playsinline muted loop disablepictureinpicture

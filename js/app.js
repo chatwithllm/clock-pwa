@@ -31,7 +31,8 @@ const SERVERLOC_KEY = 'clockpwa.serverloc.v1';
 // (admin-managed) and merged in; built-ins always present even if that's empty.
 const BUILTINS = ['Theater Room','Study Room','Kitchen','Living Room','Bedroom','Office','Garage'];
 const PROFILES_KEY = 'clockpwa.profiles.v1';
-const ANNOUNCE_SEEN_KEY = 'clockpwa.announceSeen';
+const ANNOUNCE_DISMISSED_KEY = 'clockpwa.announceDismissed';
+const ANNOUNCE_STACK_CAP = 4;
 const ANNOUNCE_POLL_MS = 15000;
 
 // Effective Profile cycle list: None + builtins + admin customs (deduped,
@@ -65,6 +66,9 @@ const app = {
   wake: null,
   isTV: false,
   _customProfiles: [],
+  _announceQueue: [],
+  _announceDismissed: null,
+  _announceModal: false,
   reduceMotion: false,
   state: REST,
   idleTimer: null,
@@ -440,28 +444,141 @@ function applyClockOptions(){
 }
 
 // ---------- Announcements (server-pushed broadcast) ----------
-// Poll announce.json (network-first); when a NEW announcement targets this device
-// (target 'all' or matches the profile) and isn't stale, show the overlay.
+// Minimal HTML escaper for text rendered via innerHTML (toast stack).
+function escHtml(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Coerce a parsed announce.json into an array. Accepts a legacy single object.
+function normalizeQueue(j){
+  if (Array.isArray(j)) return j;
+  if (j && typeof j === 'object' && j.id && j.text) return [j];   // legacy single
+  return [];
+}
+
+// PURE: decide what to show. No DOM, no app state.
+// Returns { center, stack, moreCount, soonestExpiryMs }:
+//   center  = newest live entry (or null)
+//   stack   = older live entries to render as toasts, oldest-first (top->bottom), capped to the
+//             ANNOUNCE_STACK_CAP most-recent older entries
+//   moreCount = hidden older entries collapsed into the "+N more" chip
+//   soonestExpiryMs = ms until the next entry expires (Infinity if none live)
+function announceView(queue, profile, nowMs, dismissed){
+  const prof = String(profile || 'None').toLowerCase();
+  const live = [];
+  for (const a of (Array.isArray(queue) ? queue : [])){
+    if (!a || !a.id || !a.text) continue;
+    if (dismissed && dismissed.has(a.id)) continue;
+    const tgt = String(a.target || 'all').toLowerCase();
+    if (tgt !== 'all' && tgt !== prof) continue;
+    const dur = Number(a.duration) > 0 ? Number(a.duration) : 20;
+    const ageSec = a.ts ? (nowMs - Number(a.ts)) / 1000 : 0;
+    if (ageSec >= dur) continue;                       // expired
+    live.push({ a: a, expiresInMs: (dur - ageSec) * 1000 });
+  }
+  live.sort((x, y) => Number(x.a.ts) - Number(y.a.ts));  // ascending by ts
+  if (live.length === 0) return { center:null, stack:[], moreCount:0, soonestExpiryMs:Infinity };
+  const soonest = live.reduce((m, e) => Math.min(m, e.expiresInMs), Infinity);
+  const center = live[live.length - 1].a;                // newest
+  const olders = live.slice(0, -1).map(e => e.a);        // ascending, all but newest
+  const shown = olders.slice(-ANNOUNCE_STACK_CAP);       // most-recent older entries
+  const moreCount = Math.max(0, olders.length - shown.length);
+  return { center, stack: shown, moreCount, soonestExpiryMs: soonest };
+}
+
+function persistDismissed(){
+  try { localStorage.setItem(ANNOUNCE_DISMISSED_KEY, JSON.stringify(Array.from(app._announceDismissed))); } catch(_){}
+}
+// Keep the dismissed-set bounded: forget ids no longer present in the queue.
+function pruneDismissed(){
+  try {
+    const ids = new Set((app._announceQueue || []).map(a => a && a.id).filter(Boolean));
+    let changed = false;
+    for (const id of Array.from(app._announceDismissed)){
+      if (!ids.has(id)){ app._announceDismissed.delete(id); changed = true; }
+    }
+    if (changed) persistDismissed();
+  } catch(_){}
+}
+
+function announceSub(a){
+  return a.from || (a.target && String(a.target).toLowerCase() !== 'all' ? a.target : '');
+}
+
+// Apply a computed view to the DOM. Idempotent.
+function renderAnnounce(view){
+  try {
+    const el = $('announce');
+    const stackEl = $('announceStack');
+    if (!el) return;
+
+    if (!view.center){                                   // nothing live
+      el.hidden = true; el.classList.remove('announce--card');
+      if (stackEl){ stackEl.innerHTML = ''; stackEl.hidden = true; }
+      if (app._announceModal && app.nav){ app.nav.setScope(app.state === PANEL ? $('panel') : document); }
+      app._announceModal = false;
+      if (app._announceTimer){ clearTimeout(app._announceTimer); app._announceTimer = null; }
+      return;
+    }
+
+    const c = view.center;
+    $('announceIcon').textContent = c.icon || '📢';
+    $('announceText').textContent = c.text;
+    const sub = announceSub(c);
+    $('announceSub').textContent = sub ? ('— ' + sub) : '';
+    el.dataset.id = c.id;
+    el.hidden = false;
+
+    const multi = view.stack.length > 0 || view.moreCount > 0;
+    if (multi){
+      el.classList.add('announce--card');
+      el.removeAttribute('aria-modal');
+      if (app._announceModal && app.nav){ app.nav.setScope(app.state === PANEL ? $('panel') : document); }
+      app._announceModal = false;
+      let html = '';
+      if (view.moreCount > 0) html += '<div class="toast toast-more">+' + view.moreCount + ' more</div>';
+      for (const a of view.stack){
+        const s = announceSub(a);
+        html += '<div class="toast"><span class="toast-icon">' + escHtml(a.icon || '📢') + '</span>'
+              + '<span class="toast-text">' + escHtml(a.text)
+              + (s ? ('<span class="toast-sub">— ' + escHtml(s) + '</span>') : '')
+              + '</span></div>';
+      }
+      if (stackEl){ stackEl.innerHTML = html; stackEl.hidden = false; }
+    } else {
+      el.classList.remove('announce--card');
+      el.setAttribute('aria-modal', 'true');
+      if (stackEl){ stackEl.innerHTML = ''; stackEl.hidden = true; }
+      if (!app._announceModal && app.nav){ app.nav.setScope(el); app.nav.focusFirst(); }
+      app._announceModal = true;
+    }
+
+    if (app._announceTimer){ clearTimeout(app._announceTimer); app._announceTimer = null; }
+    if (isFinite(view.soonestExpiryMs)){
+      const delay = Math.max(250, Math.min(view.soonestExpiryMs + 50, 60000));
+      app._announceTimer = setTimeout(updateAnnounceView, delay);
+    }
+  } catch(_){}
+}
+
+// Recompute from the current queue and render.
+function updateAnnounceView(){
+  pruneDismissed();
+  const view = announceView(app._announceQueue, app.settings && app.settings.profile, Date.now(), app._announceDismissed);
+  renderAnnounce(view);
+}
+
+// Poll the server queue (network-first); on success refresh the view.
 async function pollAnnounce(){
   if (typeof fetch !== 'function') return;
   try {
     const r = await fetch('announce.json?ts=' + Date.now(), { cache:'no-store' });
     if (!r.ok) return;
     const j = await r.json();
-    if (!j || !j.id || !j.text) return;
-    if (j.id === app._announceSeen) return;
-    const target = String(j.target || 'all');
-    const prof = (app.settings.profile || 'None');
-    if (target.toLowerCase() !== 'all' && target.toLowerCase() !== prof.toLowerCase()){
-      app._announceSeen = j.id; return;                 // not for this device
-    }
-    const dur = Number(j.duration) > 0 ? Number(j.duration) : 20;
-    const ageSec = j.ts ? (Date.now() - Number(j.ts)) / 1000 : 0;
-    if (ageSec > dur + 10){ app._announceSeen = j.id; return; }   // stale, don't pop on load
-    showAnnouncement(j, Math.max(4, Math.round(dur - ageSec)));
-    app._announceSeen = j.id;
-    try { localStorage.setItem(ANNOUNCE_SEEN_KEY, j.id); } catch(_){}
-  } catch(_) { /* offline / no file — ignore */ }
+    app._announceQueue = normalizeQueue(j);
+    updateAnnounceView();
+  } catch(_) { /* offline / no file — keep current view */ }
 }
 
 // Fetch the admin-managed custom profile list (network-first); cache to
@@ -479,27 +596,14 @@ async function pollProfiles(){
   } catch(_) { /* offline / no file — keep cached value */ }
 }
 
-function showAnnouncement(j, secondsLeft){
-  try {
-    const el = $('announce'); if (!el) return;
-    $('announceIcon').textContent = j.icon || '📢';
-    $('announceText').textContent = j.text;
-    const from = (j.from || (j.target && j.target !== 'all' ? j.target : '')) ;
-    $('announceSub').textContent = from ? ('— ' + from) : '';
-    el.hidden = false;
-    // Make it remote-operable: scope D-pad to the overlay and focus Dismiss.
-    if (app.nav){ app.nav.setScope(el); app.nav.focusFirst(); }
-    if (app._announceTimer) clearTimeout(app._announceTimer);
-    app._announceTimer = setTimeout(dismissAnnounce, secondsLeft * 1000);
-  } catch(_){}
-}
-
+// Dismiss the currently-centered announcement: remember its id, then re-render
+// (promotes the next-newest live entry into the center, or hides if none left).
 function dismissAnnounce(){
   try {
-    const el = $('announce'); if (!el || el.hidden) return;
-    el.hidden = true;
-    if (app._announceTimer){ clearTimeout(app._announceTimer); app._announceTimer = null; }
-    if (app.nav) app.nav.setScope(app.state === PANEL ? $('panel') : document);
+    const el = $('announce');
+    const id = el && el.dataset ? el.dataset.id : '';
+    if (id && app._announceDismissed){ app._announceDismissed.add(id); persistDismissed(); }
+    updateAnnounceView();
   } catch(_){}
 }
 
@@ -758,8 +862,9 @@ async function boot(){
 
   // Announcements: poll the server for broadcasts (now + every 15s + on refocus).
   try {
-    app._announceSeen = localStorage.getItem(ANNOUNCE_SEEN_KEY) || '';
-  } catch(_) { app._announceSeen = ''; }
+    app._announceDismissed = new Set(JSON.parse(localStorage.getItem(ANNOUNCE_DISMISSED_KEY) || '[]') || []);
+  } catch(_) { app._announceDismissed = new Set(); }
+  app._announceQueue = [];
   try {
     pollAnnounce(); pollProfiles();
     app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); }, ANNOUNCE_POLL_MS);
