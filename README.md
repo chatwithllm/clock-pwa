@@ -65,6 +65,40 @@ correct MIME type and keeps `sw.js` uncached so updates ship.
 > the cert recipe in that section. Over plain `http://<LAN-IP>` the clock + weather work but the
 > service worker / install are blocked by the browser.
 
+### Updating a deployed container
+
+The image is built from source (no published registry image), so update = pull + rebuild on the
+host that runs it:
+
+```bash
+cd clock-pwa
+git pull
+docker compose up -d --build     # rebuild image + recreate container in place
+docker image prune -f            # optional: drop the old image layer
+```
+
+One-liner for routine updates:
+
+```bash
+cd clock-pwa && git pull && docker compose up -d --build && docker image prune -f
+```
+
+Verify it landed:
+
+```bash
+docker compose ps                 # container Up, recreated
+git log --oneline -1              # matches GitHub HEAD
+curl -s localhost:8080/config.json
+```
+
+Notes:
+- **Keep your location out of the tracked compose file** so `git pull` never conflicts. Put your
+  `CLOCK_LAT/CLOCK_LON/CLOCK_CITY` in a **`.env`** file or a **`docker-compose.override.yml`**
+  (both are auto-loaded by compose and aren't overwritten by pulls). If you did edit
+  `docker-compose.yml` directly, use `git stash` → `git pull` → `git stash pop`.
+- **Client devices** (phones/TVs already open) cache via the service worker. After redeploy each
+  device needs **one reload** to pick up the new versioned SW; future loads update automatically.
+
 ---
 
 ## Support floor (baseline)
