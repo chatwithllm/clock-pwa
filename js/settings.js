@@ -27,6 +27,7 @@ const DEFAULTS = {
   timeSource: 'device', // 'device' (own clock) | 'server' (sync to host clock)
   profile: 'None',      // device room profile (Theater Room / Kitchen / …) for targeting + future room behavior
   secondTz: 'off',      // secondary-clock zone id (see SECOND_ZONES in app.js)
+  soundEnabled: false,  // notification chimes (requires a one-time enable gesture per device)
   lat: null,            // CUSTOM location (set via ZIP/city/geolocation/URL)
   lon: null,
   city: null,
@@ -105,6 +106,7 @@ export function saveSettings(s){
     mode: s.mode, clockStyle: s.clockStyle, orientation: s.orientation, display: s.display, sunArc: s.sunArc, hour24: s.hour24, seconds: s.seconds, date: s.date,
     night: s.night, nightStart: s.nightStart, nightEnd: s.nightEnd,
     locationMode: s.locationMode, timeSource: s.timeSource, profile: s.profile, secondTz: s.secondTz,
+    soundEnabled: s.soundEnabled,
     lat: s.lat, lon: s.lon, city: s.city,
   };
   safeLSSet(LS_KEY, JSON.stringify(out));
