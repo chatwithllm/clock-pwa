@@ -55,6 +55,13 @@
       <button class="ctrl" id="btnDim" type="button" data-nav>Dim</button>
       <button class="ctrl" id="btnGear" type="button" data-nav aria-haspopup="dialog">Settings</button>
     </nav>
+
+    <!-- Secondary clock (small, subtle; optional) -->
+    <div class="second-clock" id="secondClock" hidden aria-label="Secondary clock">
+      <span class="sc-label" id="secondLabel"></span>
+      <span class="sc-time" id="secondTime"></span>
+      <span class="sc-day" id="secondDay"></span>
+    </div>
   </main>
 
   <!-- OVERLAYS: settings panel (display:none when closed → zero layout space) -->
@@ -95,15 +102,23 @@
         <button class="ctrl" id="setDate" type="button" data-nav>On</button>
       </div>
       <div class="row">
+        <span class="row-label">Second clock</span>
+        <button class="ctrl" id="setSecond" type="button" data-nav>Off</button>
+      </div>
+      <div class="row">
         <span class="row-label">Night dim</span>
         <button class="ctrl" id="setNight" type="button" data-nav>Off</button>
       </div>
 
+      <div class="row">
+        <span class="row-label">Location</span>
+        <button class="ctrl" id="setLocMode" type="button" data-nav>Server</button>
+      </div>
       <div class="row row-col">
-        <label class="row-label" for="setCity">City search</label>
+        <label class="row-label" for="setCity">Your location (ZIP or city)</label>
         <div class="city-wrap">
           <input class="city-input" id="setCity" type="text" inputmode="search"
-                 placeholder="City name (touch only)" data-nav autocomplete="off">
+                 placeholder="ZIP code or city name" data-nav autocomplete="off">
           <button class="ctrl" id="setCityGo" type="button" data-nav>Find</button>
         </div>
         <div class="city-status" id="cityStatus" aria-live="polite"></div>

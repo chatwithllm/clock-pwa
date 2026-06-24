@@ -103,6 +103,24 @@ export async function geocodeCity(name){
   return null;
 }
 
+// US ZIP → {lat,lon,city} via zippopotam.us (free, no key, no signup). Null on miss.
+export async function zipLookup(zip){
+  const z = (zip || '').trim();
+  if (!/^\d{5}$/.test(z)) return null;
+  try {
+    const j = await fetchJSON('https://api.zippopotam.us/us/' + z, 8000);
+    if (j && Array.isArray(j.places) && j.places.length){
+      const p = j.places[0];
+      const lat = parseFloat(p.latitude), lon = parseFloat(p.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lon)){
+        const name = [p['place name'], p['state abbreviation']].filter(Boolean).join(', ');
+        return { lat, lon, city: name || ('ZIP ' + z) };
+      }
+    }
+  } catch(_) {}
+  return null;
+}
+
 // Temperature helpers. Data is stored in Celsius; both units are shown on display.
 function valid(c){ return c != null && Number.isFinite(c); }
 export function fF(c){ return valid(c) ? Math.round(c * 9/5 + 32) : null; } // °F integer

@@ -4,13 +4,28 @@
 
 import { loadSettings, saveSettings, DEFAULT_LOCATION } from './settings.js';
 import { Clock, sampleFPS } from './clock.js';
-import { getWeather, geocodeCity, bothTemps, wmoInfo, loadCache } from './weather.js';
+import { getWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache } from './weather.js';
 import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX, paletteForCode } from './weatherfx.js';
 import { SunArc } from './sunarc.js';
 
 const $ = (id) => document.getElementById(id);
+
+// Curated secondary-clock zones (D-pad friendly cycle). 'off' hides it.
+const SECOND_ZONES = [
+  { id:'off',    label:'Off' },
+  { id:'utc',    label:'UTC',          tz:'UTC' },
+  { id:'nyc',    label:'New York',     tz:'America/New_York' },
+  { id:'chi',    label:'Chicago',      tz:'America/Chicago' },
+  { id:'la',     label:'Los Angeles',  tz:'America/Los_Angeles' },
+  { id:'london', label:'London',       tz:'Europe/London' },
+  { id:'paris',  label:'Paris',        tz:'Europe/Paris' },
+  { id:'india',  label:'India',        tz:'Asia/Kolkata' },
+  { id:'tokyo',  label:'Tokyo',        tz:'Asia/Tokyo' },
+  { id:'sydney', label:'Sydney',       tz:'Australia/Sydney' },
+];
+const SERVERLOC_KEY = 'clockpwa.serverloc.v1';
 
 // ---- State machine (explicit reducer) ----
 const REST = 'REST', ACTIVE = 'ACTIVE', PANEL = 'PANEL';
@@ -151,10 +166,43 @@ function checkNightSchedule(){
   if (on !== app.deepDim) applyDim(on);
 }
 
+// ---------- Server-provided location (/config.json) ----------
+function loadServerLocCache(){
+  try { const r = localStorage.getItem(SERVERLOC_KEY); return r ? JSON.parse(r) : null; } catch(_){ return null; }
+}
+async function loadServerConfig(){
+  // Seed from cache so 'server' mode works instantly / offline.
+  app.serverLoc = loadServerLocCache();
+  if (typeof fetch !== 'function') return;
+  let ctrl = null, t = null;
+  try { ctrl = new AbortController(); t = setTimeout(()=>ctrl.abort(), 4000); } catch(_) { ctrl = null; }
+  try {
+    const r = await fetch('config.json', ctrl ? { cache:'no-store', signal:ctrl.signal } : { cache:'no-store' });
+    if (t) clearTimeout(t);
+    if (!r.ok) return;
+    const j = await r.json();
+    const L = j && j.location;
+    if (L && Number.isFinite(L.lat) && Number.isFinite(L.lon)){
+      app.serverLoc = { lat:L.lat, lon:L.lon, city:L.city || 'Server location' };
+      try { localStorage.setItem(SERVERLOC_KEY, JSON.stringify(app.serverLoc)); } catch(_){}
+    }
+  } catch(_) { if (t) clearTimeout(t); /* keep cached/none — clock unaffected */ }
+}
+
+// Resolve the location to fetch weather for, honoring the Location mode.
+function effectiveLocation(){
+  const s = app.settings;
+  if (s._locationSource === 'url') return { lat:s.lat, lon:s.lon, city:s.city }; // explicit URL wins
+  if (s.locationMode === 'server' && app.serverLoc) return app.serverLoc;
+  if (Number.isFinite(s.lat) && Number.isFinite(s.lon)) return { lat:s.lat, lon:s.lon, city:s.city };
+  if (app.serverLoc) return app.serverLoc;
+  return { lat:s.lat, lon:s.lon, city:s.city };
+}
+
 // ---------- Weather ----------
 async function refreshWeather(){
   try {
-    const loc = { lat: app.settings.lat, lon: app.settings.lon, city: app.settings.city };
+    const loc = effectiveLocation();
     const w = await getWeather(loc);
     if (w){
       app.lastWeather = w; paintWeather(w);
@@ -219,6 +267,9 @@ function syncButtons(){
     : s.orientation === 'landscape' ? 'Landscape' : 'Auto';
   $('setDisplay').textContent = s.display === 'dynamic' ? 'Dynamic' : 'Plain';
   $('setSun').textContent = s.sunArc ? 'On' : 'Off';
+  const sz = SECOND_ZONES.find(z => z.id === s.secondTz);
+  $('setSecond').textContent = sz ? sz.label : 'Off';
+  $('setLocMode').textContent = s.locationMode === 'custom' ? 'Custom' : 'Server';
   $('setHour').textContent = s.hour24 ? '24h' : '12h';
   $('setSeconds').textContent = s.seconds ? 'On' : 'Off';
   $('setDate').textContent = s.date ? 'On' : 'Off';
@@ -227,6 +278,34 @@ function syncButtons(){
 }
 function syncDimButton(){
   $('btnDim').textContent = app.deepDim ? 'Undim' : 'Dim';
+}
+
+// Secondary clock — small subtle label + time in a chosen timezone. Feature-detected
+// (Intl timeZone); hides on 'off' or if unsupported. Never throws.
+function updateSecondClock(){
+  try {
+    const el = $('secondClock'); if (!el) return;
+    const z = SECOND_ZONES.find(x => x.id === app.settings.secondTz);
+    if (!z || z.id === 'off' || !z.tz){ el.hidden = true; return; }
+    const now = new Date();
+    let time;
+    try {
+      time = new Intl.DateTimeFormat(undefined,
+        { timeZone: z.tz, hour:'numeric', minute:'2-digit', hour12: !app.settings.hour24 }).format(now);
+    } catch(_) { el.hidden = true; return; }   // zone unsupported on this engine
+    el.hidden = false;
+    $('secondLabel').textContent = z.label.toUpperCase();
+    $('secondTime').textContent = time;
+    // Day offset hint (+1d / -1d) relative to device local date.
+    let dayHint = '';
+    try {
+      const zoneYmd = new Intl.DateTimeFormat('en-CA', { timeZone: z.tz, year:'numeric', month:'2-digit', day:'2-digit' }).format(now);
+      const localYmd = new Intl.DateTimeFormat('en-CA', { year:'numeric', month:'2-digit', day:'2-digit' }).format(now);
+      if (zoneYmd > localYmd) dayHint = '+1d';
+      else if (zoneYmd < localYmd) dayHint = '−1d';
+    } catch(_){}
+    $('secondDay').textContent = dayHint;
+  } catch(_){}
 }
 
 // Reflect wake-lock state in the chrome-band indicator. Hidden where it doesn't
@@ -299,6 +378,16 @@ function wireControls(){
     app.settings.sunArc = !app.settings.sunArc;
     persist(); updateSun(); syncButtons();
   });
+  $('setSecond').addEventListener('click', () => {
+    const ids = SECOND_ZONES.map(z => z.id);
+    const i = ids.indexOf(app.settings.secondTz);
+    app.settings.secondTz = ids[(i + 1) % ids.length] || 'off';
+    persist(); updateSecondClock(); syncButtons();
+  });
+  $('setLocMode').addEventListener('click', () => {
+    app.settings.locationMode = app.settings.locationMode === 'server' ? 'custom' : 'server';
+    persist(); syncButtons(); refreshWeather();
+  });
   $('setClose').addEventListener('click', () => setState(ACTIVE));
 
   $('setCityGo').addEventListener('click', doCitySearch);
@@ -310,14 +399,18 @@ function wireControls(){
 }
 
 async function doCitySearch(){
-  const name = $('setCity').value;
+  const raw = ($('setCity').value || '').trim();
   const status = $('cityStatus');
+  if (!raw){ status.textContent = 'Enter a ZIP or city.'; return; }
   status.textContent = 'Searching…';
   try {
-    const hit = await geocodeCity(name);
+    // 5-digit input → US ZIP via zippopotam; otherwise a city/place name.
+    const hit = /^\d{5}$/.test(raw) ? await zipLookup(raw) : await geocodeCity(raw);
     if (!hit){ status.textContent = 'Not found.'; return; }
     app.settings.lat = hit.lat; app.settings.lon = hit.lon; app.settings.city = hit.city;
-    persist();
+    app.settings.locationMode = 'custom';        // choosing your own location => custom mode
+    app.settings._locationSource = 'stored';
+    persist(); syncButtons();
     status.textContent = 'Set: ' + hit.city;
     await refreshWeather();
   } catch(_) { status.textContent = 'Search failed.'; }
@@ -333,7 +426,9 @@ function doGeolocate(){
         app.settings.lat = pos.coords.latitude;
         app.settings.lon = pos.coords.longitude;
         app.settings.city = null;
-        persist();
+        app.settings.locationMode = 'custom';
+        app.settings._locationSource = 'stored';
+        persist(); syncButtons();
         status.textContent = 'Location set.';
         await refreshWeather();
       },
@@ -390,7 +485,8 @@ async function boot(){
     app.settings = loadSettings();
   } catch(_) {
     app.settings = { mode:'digital', hour24:false, seconds:true, date:true, night:false,
-                     nightStart:21, nightEnd:7, lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
+                     nightStart:21, nightEnd:7, locationMode:'server', secondTz:'off',
+                     lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
   }
 
   try { app.reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(_){ app.reduceMotion = false; }
@@ -443,6 +539,12 @@ async function boot(){
 
   // Sun-position arc (decorative; driven by cached sunrise/sunset, no extra network).
   try { app.sun = new SunArc($('wxSun')); } catch(_){}
+
+  // Secondary clock (subtle; updates every second). Hidden unless a zone is chosen.
+  try { updateSecondClock(); app.secondTimer = setInterval(updateSecondClock, 1000); } catch(_){}
+
+  // Server-provided location (/config.json) — seeds 'server' mode before first fetch.
+  try { await loadServerConfig(); } catch(_){}
 
   // Weather: never blocks the clock.
   try {

@@ -23,7 +23,9 @@ const DEFAULTS = {
   night: false,         // night-dim schedule enabled
   nightStart: 21,       // hour (local) dim turns on
   nightEnd: 7,          // hour (local) dim turns off
-  lat: null,
+  locationMode: 'server', // 'server' (use /config.json) | 'custom' (lat/lon below)
+  secondTz: 'off',      // secondary-clock zone id (see SECOND_ZONES in app.js)
+  lat: null,            // CUSTOM location (set via ZIP/city/geolocation/URL)
   lon: null,
   city: null,
 };
@@ -53,6 +55,10 @@ function readURL(){
     if (disp === 'plain' || disp === 'dynamic') out.display = disp;
     const cstyle = (q.get('clockstyle') || '').toLowerCase();
     if (cstyle === 'classic' || cstyle === 'block') out.clockStyle = cstyle;
+    const loc = (q.get('loc') || '').toLowerCase();
+    if (loc === 'server' || loc === 'custom') out.locationMode = loc;
+    const second = q.get('second');
+    if (second) out.secondTz = second.toLowerCase();
     const sun = (q.get('sun') || '').toLowerCase();
     if (sun === 'on' || sun === '1' || sun === 'true') out.sunArc = true;
     if (sun === 'off' || sun === '0' || sun === 'false') out.sunArc = false;
@@ -82,6 +88,8 @@ export function loadSettings(){
   } else {
     s._locationSource = url.lat != null ? 'url' : (stored.lat != null ? 'stored' : 'default');
   }
+  // An explicit ?lat=&lon= in the URL means the user wants THAT location → custom mode.
+  if (url.lat != null && url.locationMode == null) s.locationMode = 'custom';
   return s;
 }
 
@@ -90,6 +98,7 @@ export function saveSettings(s){
   const out = {
     mode: s.mode, clockStyle: s.clockStyle, orientation: s.orientation, display: s.display, sunArc: s.sunArc, hour24: s.hour24, seconds: s.seconds, date: s.date,
     night: s.night, nightStart: s.nightStart, nightEnd: s.nightEnd,
+    locationMode: s.locationMode, secondTz: s.secondTz,
     lat: s.lat, lon: s.lon, city: s.city,
   };
   safeLSSet(LS_KEY, JSON.stringify(out));

@@ -5,4 +5,8 @@ services:
     container_name: clock-pwa
     ports:
       - "8080:80"     # open http://localhost:8080
+    volumes:
+      # Edit config.json on the host to set the server location for all devices —
+      # no rebuild needed (it's served no-cache, applies on next page load).
+      - ./config.json:/usr/share/nginx/html/config.json:ro
     restart: unless-stopped

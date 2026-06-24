@@ -28,6 +28,19 @@ docker compose up -d          # or: docker build -t clock-pwa . && docker run -d
 
 Then open **http://localhost:8080**.
 
+### Set the server location (for a device fleet)
+
+Edit **`config.json`** on the host and reload — it's mounted into the container and served
+no-cache, so the change applies to every device on its next load (no rebuild):
+
+```json
+{ "location": { "lat": 39.7684, "lon": -86.1581, "city": "Indianapolis" } }
+```
+
+In the app, **Settings → Location → Server** uses this. Devices that can't geolocate (TVs, or
+boxes on a VLAN with no internet GPS) get the location from the server this way. A user can switch
+**Location → Custom** and enter their own **US ZIP** (e.g. `46204`) or a **city name** instead.
+
 **One-click install:** because `localhost` is a secure context, the service worker registers
 and Chrome/Edge show an **install icon** in the address bar — click it to install the PWA (or
 on a phone over real HTTPS, *Add to Home Screen*). The nginx config serves the manifest with the
@@ -187,9 +200,11 @@ Interact once and the control band fades in; it auto-hides after ~5 seconds of n
 - **Mode** — toggle digital ⇄ analog (persists in localStorage).
 - **Unit** — toggle °F ⇄ °C live.
 - **Dim** — manual near-black dim toggle.
-- **Settings** — orientation (auto/portrait/landscape), **Display** (plain/dynamic),
-  **Sun arc** (on/off), 12/24h, seconds on/off, date on/off, units, night-dim schedule
-  (default **off**), city search (touch), and "Use my location" (Geolocation where available).
+- **Settings** — orientation (auto/portrait/landscape), **Display** (plain/dynamic), clock
+  **Style** (classic/block), **Sun arc** (on/off), **Second clock** (curated timezone, subtle
+  corner readout), 12/24h, seconds on/off, date on/off, night-dim schedule (default **off**),
+  **Location** (Server/Custom), ZIP/city search, and "Use my location" (Geolocation where available).
+  Temperatures always show **both °F and °C**.
 
 **Sun arc.** A small SVG in the weather card traces the sun from sunrise (left horizon) → solar
 noon (apex) → sunset (right horizon), positioned by the current time of day. Elapsed portion is a
