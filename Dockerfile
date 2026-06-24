@@ -10,5 +10,9 @@ COPY css   /usr/share/nginx/html/css
 COPY js    /usr/share/nginx/html/js
 COPY icons /usr/share/nginx/html/icons
 
+# Optional: generate config.json from CLOCK_LAT/CLOCK_LON/CLOCK_CITY env at startup.
+COPY docker-entrypoint.d/30-clock-config.sh /docker-entrypoint.d/30-clock-config.sh
+RUN chmod +x /docker-entrypoint.d/30-clock-config.sh
+
 EXPOSE 80
 # nginx:alpine already runs `nginx -g 'daemon off;'` as CMD

@@ -30,8 +30,22 @@ Then open **http://localhost:8080**.
 
 ### Set the server location (for a device fleet)
 
-Edit **`config.json`** on the host and reload — it's mounted into the container and served
-no-cache, so the change applies to every device on its next load (no rebuild):
+**Option A — env vars in compose** (default). Set them in `docker-compose.yml` and bring it up;
+an entrypoint writes `config.json` at container start:
+
+```yaml
+environment:
+  CLOCK_LAT: "39.7684"
+  CLOCK_LON: "-86.1581"
+  CLOCK_CITY: "Indianapolis"
+```
+```bash
+docker compose up -d        # change the values and re-run to update
+```
+
+**Option B — mounted file** (edit live, no restart). Comment out the `environment:` block,
+uncomment the `volumes:` mount, then edit `config.json` on the host (served no-cache, applies on
+the next page load). Use one option or the other, not both.
 
 ```json
 { "location": { "lat": 39.7684, "lon": -86.1581, "city": "Indianapolis" } }

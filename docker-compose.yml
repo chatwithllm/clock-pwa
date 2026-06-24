@@ -5,8 +5,15 @@ services:
     container_name: clock-pwa
     ports:
       - "8080:80"     # open http://localhost:8080
-    volumes:
-      # Edit config.json on the host to set the server location for all devices —
-      # no rebuild needed (it's served no-cache, applies on next page load).
-      - ./config.json:/usr/share/nginx/html/config.json:ro
+    environment:
+      # Server location for all devices (Settings -> Location -> Server).
+      # Written into config.json at container start. Edit + `docker compose up -d`.
+      CLOCK_LAT: "39.7684"
+      CLOCK_LON: "-86.1581"
+      CLOCK_CITY: "Indianapolis"
+    # Alternative to the env vars above: mount + live-edit a config.json instead
+    # (don't use both — a read-only mount can't be overwritten by the env step).
+    # Comment out the `environment:` block above if you use this.
+    # volumes:
+    #   - ./config.json:/usr/share/nginx/html/config.json
     restart: unless-stopped
