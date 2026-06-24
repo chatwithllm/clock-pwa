@@ -3,7 +3,7 @@
 // weather) NEVER blanks the clock.
 
 import { loadSettings, saveSettings, DEFAULT_LOCATION } from './settings.js';
-import { Clock, sampleFPS } from './clock.js';
+import { Clock, sampleFPS, setClockOffset, nowDate } from './clock.js';
 import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache } from './weather.js';
 import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
@@ -129,7 +129,7 @@ function isAfterDark(){
     const w = app.lastWeather; if (!w || !w.sunrise || !w.sunset) return false;
     const rise = Date.parse(w.sunrise), set = Date.parse(w.sunset);
     if (isNaN(rise) || isNaN(set)) return false;
-    const now = Date.now();
+    const now = nowDate().getTime();
     return now < rise || now > set;
   } catch(_){ return false; }
 }
@@ -187,7 +187,7 @@ function applyDim(on){
 
 function checkNightSchedule(){
   if (!app.settings.night){ if (app.deepDim) applyDim(false); return; }
-  const h = new Date().getHours();
+  const h = nowDate().getHours();
   const { nightStart, nightEnd } = app.settings;
   let on;
   if (nightStart <= nightEnd) on = (h >= nightStart && h < nightEnd);
@@ -226,6 +226,30 @@ function effectiveLocation(){
   if (Number.isFinite(s.lat) && Number.isFinite(s.lon)) return { lat:s.lat, lon:s.lon, city:s.city };
   if (app.serverLoc) return app.serverLoc;
   return { lat:s.lat, lon:s.lon, city:s.city };
+}
+
+// ---------- Time source (Device vs Server) ----------
+// Server mode measures the host clock from an HTTP Date header (corrected for the
+// round trip) so every display shows the same time regardless of its own system
+// clock. Uses config.json (network-first in the SW) so the Date header is fresh.
+async function syncServerTime(){
+  if (app.settings.timeSource !== 'server'){ setClockOffset(0); return; }
+  if (typeof fetch !== 'function') return;
+  try {
+    const t0 = Date.now();
+    const r = await fetch('config.json?ts=' + t0, { cache:'no-store' });
+    const t1 = Date.now();
+    const hdr = r.headers.get('date');
+    if (!hdr) return;
+    const serverMs = Date.parse(hdr);
+    if (isNaN(serverMs)) return;
+    // The server stamped Date ~ the midpoint of the round trip.
+    setClockOffset(serverMs - (t0 + t1) / 2);
+  } catch(_) { /* keep the previous offset; clock keeps running */ }
+}
+function applyTimeSource(){
+  if (app.settings.timeSource === 'server') syncServerTime();
+  else setClockOffset(0);
 }
 
 // ---------- Weather ----------
@@ -317,6 +341,7 @@ function syncButtons(){
   const sz = SECOND_ZONES.find(z => z.id === s.secondTz);
   $('setSecond').textContent = sz ? sz.label : 'Off';
   $('setLocMode').textContent = s.locationMode === 'custom' ? 'Custom' : 'Server';
+  $('setTime').textContent = s.timeSource === 'server' ? 'Server' : 'Device';
   $('setHour').textContent = s.hour24 ? '24h' : '12h';
   $('setSeconds').textContent = s.seconds ? 'On' : 'Off';
   $('setDate').textContent = s.date ? 'On' : 'Off';
@@ -334,7 +359,7 @@ function updateSecondClock(){
     const el = $('secondClock'); if (!el) return;
     const z = SECOND_ZONES.find(x => x.id === app.settings.secondTz);
     if (!z || z.id === 'off' || !z.tz){ el.hidden = true; return; }
-    const now = new Date();
+    const now = nowDate();
     let time;
     try {
       time = new Intl.DateTimeFormat(undefined,
@@ -435,6 +460,10 @@ function wireControls(){
     app.settings.locationMode = app.settings.locationMode === 'server' ? 'custom' : 'server';
     persist(); syncButtons(); refreshWeather();
   });
+  $('setTime').addEventListener('click', () => {
+    app.settings.timeSource = app.settings.timeSource === 'server' ? 'device' : 'server';
+    persist(); applyTimeSource(); syncButtons();
+  });
   $('setClose').addEventListener('click', () => setState(ACTIVE));
 
   $('setCityGo').addEventListener('click', doCitySearch);
@@ -533,7 +562,7 @@ async function boot(){
   } catch(_) {
     app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
                      sunArc:true, hour24:false, seconds:true, date:true, night:true,
-                     nightStart:21, nightEnd:7, locationMode:'server', secondTz:'off',
+                     nightStart:21, nightEnd:7, locationMode:'server', timeSource:'device', secondTz:'off',
                      lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
   }
 
@@ -609,6 +638,13 @@ async function boot(){
   app.sunTimer = setInterval(updateSun, 60000);
   // Re-evaluate compact sun-arc on rotation (portrait <-> landscape).
   try { window.addEventListener('resize', updateSun, { passive:true }); } catch(_){}
+
+  // Time source: sync now (if Server), resync every 5 min and when the tab refocuses.
+  try {
+    applyTimeSource();
+    app.timeTimer = setInterval(syncServerTime, 5*60*1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) syncServerTime(); });
+  } catch(_){}
 
   setState(REST);
   registerSW();

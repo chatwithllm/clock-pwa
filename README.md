@@ -125,7 +125,12 @@ At this floor `clamp()`, `min()`, `max()`, and CSS grid-gap are all safe and are
 Every modern API (Wake Lock, Geolocation, `matchMedia`, rAF) is **feature-detected**; the app
 degrades silently and never throws. The **clock never depends on the network**.
 
-The clock shows the **device's local time**, not the weather location's time.
+The clock shows the **device's local time** by default, not the weather location's time.
+
+**Time source (Settings → Time).** *Device* (default) uses each device's own system clock — so
+displays disagree if their clocks aren't synced. *Server* syncs every display to the **host's clock**
+(read from the HTTP `Date` header, round-trip corrected), so a whole fleet shows the **same time**
+regardless of each device's clock — and it works on LAN with no internet (`?time=server` to preset).
 
 ---
 

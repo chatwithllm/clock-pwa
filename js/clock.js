@@ -13,6 +13,14 @@ function el(name, attrs){
   return n;
 }
 
+// Shared clock time source. Default 0 offset = device time. When "Time: Server" is
+// selected, app.js measures the host clock and sets this offset so every display
+// shows the same time regardless of its own (possibly unsynced) system clock.
+let _offsetMs = 0;
+export function setClockOffset(ms){ _offsetMs = (typeof ms === 'number' && isFinite(ms)) ? ms : 0; }
+export function getClockOffset(){ return _offsetMs; }
+export function nowDate(){ return new Date(Date.now() + _offsetMs); }
+
 // 3-wide x 5-tall bitmap font for the Block Matrix (dot-matrix LED) style.
 // '1' = lit cell, rows top->bottom. ' ' (space) is all-off (12h leading space).
 const BLOCK_FONT = {
@@ -123,7 +131,7 @@ export class Clock {
     this._analog = null;
 
     this._buildFlipGroups();
-    this._paintDigital(new Date(), true);   // initial: no flip animation
+    this._paintDigital(nowDate(), true);   // initial: no flip animation
     this._layoutFlip();
     this._observeStage();
   }
@@ -257,7 +265,7 @@ export class Clock {
     this.stage.appendChild(svg);
     this._analog = { hour, min, sec, c };
     this._buildDigital = null;
-    this._paintAnalog(new Date(), false);
+    this._paintAnalog(nowDate(), false);
   }
 
   // ---- Painting ----
@@ -351,7 +359,7 @@ export class Clock {
     wrap.appendChild(svg);
     this.stage.appendChild(wrap);
     this._block = { wrap, svg, dateEl, digits, seconds };
-    this._paintBlock(new Date());
+    this._paintBlock(nowDate());
   }
 
   _paintBlock(now){
@@ -395,7 +403,7 @@ export class Clock {
 
   // setTimeout re-aligned to the next wall-clock second boundary.
   _tickAligned(){
-    const now = new Date();
+    const now = nowDate();
     try { if (this._activePaint) this._activePaint(now, this._wantSweep()); } catch(_){}
     const delay = 1000 - (now.getMilliseconds());
     this._timer = setTimeout(() => {
@@ -407,7 +415,7 @@ export class Clock {
   _sweep(){
     const step = () => {
       if (!this._running || !this._wantSweep()){ this._raf = null; return; }
-      this._paintAnalog(new Date(), true);
+      this._paintAnalog(nowDate(), true);
       this._raf = requestAnimationFrame(step);
     };
     this._raf = requestAnimationFrame(step);
