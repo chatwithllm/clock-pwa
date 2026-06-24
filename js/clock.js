@@ -40,6 +40,7 @@ export class Clock {
     this._analog = null;
     this._block = null;
     this._activePaint = null;
+    this._hero = 0;        // 0 = normal, 1 = night hero (bigger)
     this._ro = null;
     this._reduceMotion = false;
     try { this._reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(_){}
@@ -56,6 +57,9 @@ export class Clock {
 
   // Public: list registered style ids + labels (for the settings selector).
   styleList(){ return Object.keys(this.styles).map(id => ({ id, label: this.styles[id].label })); }
+
+  // Hero size level (0 normal, 1 night-bigger). Re-lays out the flip clock.
+  setHero(level){ const l = level|0; if (l === this._hero) return; this._hero = l; try { this._layoutFlip(); } catch(_){} }
 
   setOptions(patch){
     Object.assign(this.opts, patch);
@@ -196,7 +200,12 @@ export class Clock {
     } catch(_){}
     if (availW <= 0 || availH <= 0) return;
     const n = b.nGroups, wK = 1.16, gapK = 0.12, ampmK = b.hasAmpm ? 0.5 : 0;
-    const vFrac = b.dateEl ? 0.66 : 0.8;
+    const landscape = availW > availH;
+    // Landscape is usually height-bound — let the hero clock claim more height.
+    // Night (_hero=1) frees the sun tile, so it goes a touch bigger still.
+    let vFrac = landscape ? (b.dateEl ? 0.74 : 0.86) : (b.dateEl ? 0.66 : 0.8);
+    if (this._hero >= 1) vFrac += 0.06;
+    vFrac = Math.min(vFrac, 0.9);
     const Hh = availH * vFrac;
     const factor = n*wK + (n-1)*gapK + (ampmK ? (ampmK + gapK) : 0);
     const Hw = availW / factor;

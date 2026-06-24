@@ -229,6 +229,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .wx-meta>span+span::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
   width:1px;height:1em;background:rgba(255,255,255,.14)}
 .wx-stale{font-size:clamp(11px,2vmin,14px);color:#d9883a;letter-spacing:.02em}
+.wx-sunrise{opacity:.85}   /* subtle inline "next sunrise" note, shown at night */
 
 /* Sun-position arc — also seamless, no divider */
 .wx-sun{width:100%;margin-top:clamp(4px,1.4vmin,14px)}

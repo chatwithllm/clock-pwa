@@ -123,6 +123,26 @@ function isEffectivePortrait(){
   try { return window.matchMedia('(orientation:portrait)').matches; } catch(_){ return true; }
 }
 
+// Is the sun currently below the horizon (after sunset / before sunrise)?
+function isAfterDark(){
+  try {
+    const w = app.lastWeather; if (!w || !w.sunrise || !w.sunset) return false;
+    const rise = Date.parse(w.sunrise), set = Date.parse(w.sunset);
+    if (isNaN(rise) || isNaN(set)) return false;
+    const now = Date.now();
+    return now < rise || now > set;
+  } catch(_){ return false; }
+}
+
+// Format an Open-Meteo naive ISO time ("…T06:17") as a clock string.
+function fmtSunTime(iso){
+  const m = /T(\d{2}):(\d{2})/.exec(iso || ''); if (!m) return '';
+  let h = parseInt(m[1], 10); const mm = m[2];
+  if (app.settings.hour24) return (h < 10 ? '0'+h : ''+h) + ':' + mm;
+  const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12; if (h === 0) h = 12;
+  return h + ':' + mm + ' ' + ap;
+}
+
 // ---------- Dynamic display (weather-tinted text + animated backdrop) ----------
 const TINT_VARS = ['--fg','--fg-dim','--accent','--hand','--hand-sec'];
 function clearTint(){
@@ -227,12 +247,23 @@ async function refreshWeather(){
 function updateSun(){
   try {
     if (!app.sun) return;
-    if (!app.settings.sunArc){ app.sun.hide(); return; } // gated by the Sun-arc setting
+    const note = $('wxSunrise');
     const w = app.lastWeather;
-    if (w && w.sunrise && w.sunset){
-      // Landscape uses the footer strip → always compact; portrait keeps the dome by day.
+    const dark = isAfterDark();
+    $('app').classList.toggle('nightsky', dark);   // night → bigger clock hero
+    if (app.clock && app.clock.setHero) app.clock.setHero(dark ? 1 : 0);
+    if (!app.settings.sunArc || !(w && w.sunrise && w.sunset)){
+      app.sun.hide(); if (note) note.hidden = true; return;
+    }
+    if (dark){
+      // After sunset: no sun tile at all — just a subtle inline "next sunrise" note.
+      app.sun.hide();
+      if (note){ note.textContent = '☾ Sunrise ' + fmtSunTime(w.sunrise); note.hidden = false; }
+    } else {
+      if (note) note.hidden = true;
+      // Day → show the arc (dome in portrait, compact line in the landscape strip).
       app.sun.update({ sunrise: w.sunrise, sunset: w.sunset, preferCompact: !isEffectivePortrait() });
-    } else app.sun.hide();
+    }
   } catch(_){}
 }
 
