@@ -68,6 +68,16 @@
       <div class="status" id="status"></div>
     </div>
 
+    <div class="card" style="margin-top:16px">
+      <label for="newProfile">Custom profiles</label>
+      <div class="row">
+        <div style="flex:2"><input id="newProfile" type="text" placeholder="e.g. Garage Gym" maxlength="40"></div>
+        <div style="flex:0"><button class="ghost" id="addProfile" type="button">Add</button></div>
+      </div>
+      <div class="presets" id="profileList" style="margin-top:12px"></div>
+      <div class="status" id="profStatus"></div>
+    </div>
+
     <div class="hint">
       Each display shows messages targeted to <code>All</code> or to its own <b>Profile</b>
       (set per device in the clock's Settings → Profile). Banner auto-hides after the duration.
@@ -75,15 +85,22 @@
   </div>
 
   <script>
-    var PROFILES = ['Theater Room','Study Room','Kitchen','Living Room','Bedroom','Office','Garage'];
+    var BUILTINS = ['Theater Room','Study Room','Kitchen','Living Room','Bedroom','Office','Garage'];
+    var customProfiles = [];
     var PRESETS = ['Dinner is ready! 🍽️','Movie starting in 5 min 🎬','Time to leave 🚗','Bedtime 😴','Package delivered 📦'];
 
     var $ = function(id){ return document.getElementById(id); };
 
-    // populate target dropdown
+    // (Re)build the target dropdown from All + builtins + customs, preserving selection.
     var sel = $('target');
-    sel.innerHTML = '<option value="all">All displays</option>' +
-      PROFILES.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
+    function rebuildTargets(){
+      var prev = sel.value;
+      var all = BUILTINS.concat(customProfiles);
+      sel.innerHTML = '<option value="all">All displays</option>' +
+        all.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
+      if (prev){ sel.value = prev; }
+    }
+    rebuildTargets();
 
     // quick presets
     $('presets').innerHTML = PRESETS.map(function(p){ return '<button class="chip" type="button">'+p+'</button>'; }).join('');
@@ -121,6 +138,71 @@
         setStatus(r.ok ? 'Cleared.' : 'Failed (HTTP '+r.status+').', r.ok);
       }).catch(function(e){ setStatus('Failed: ' + e, false); });
     });
+
+    function setProfStatus(msg, ok){ var s=$('profStatus'); s.textContent=msg; s.className='status '+(ok===true?'ok':ok===false?'err':''); }
+
+    function putProfiles(){
+      return fetch('profiles.json', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ profiles: customProfiles })
+      });
+    }
+
+    function renderProfiles(){
+      $('profileList').innerHTML = customProfiles.length
+        ? customProfiles.map(function(p){
+            return '<button class="chip" type="button" data-name="'+p.replace(/"/g,'&quot;')+'">'+p+' ✕</button>';
+          }).join('')
+        : '<span class="hint" style="margin:0">No custom profiles yet. Built-in rooms are always available.</span>';
+    }
+
+    function loadProfiles(){
+      fetch('profiles.json?ts=' + Date.now(), { cache:'no-store' }).then(function(r){
+        return r.ok ? r.json() : { profiles: [] };
+      }).then(function(j){
+        customProfiles = (j && Array.isArray(j.profiles)) ? j.profiles.map(function(x){ return String(x).trim(); }).filter(Boolean) : [];
+        renderProfiles(); rebuildTargets();
+      }).catch(function(){ customProfiles = []; renderProfiles(); rebuildTargets(); });
+    }
+
+    function isDup(name){
+      var k = name.toLowerCase();
+      if (k === 'none' || k === 'all') return true;
+      var all = BUILTINS.concat(customProfiles);
+      return all.some(function(p){ return p.toLowerCase() === k; });
+    }
+
+    $('addProfile').addEventListener('click', function(){
+      var name = $('newProfile').value.trim();
+      if (!name){ setProfStatus('Enter a name first.', false); return; }
+      if (isDup(name)){ setProfStatus('"'+name+'" already exists.', false); return; }
+      customProfiles.push(name);
+      renderProfiles(); rebuildTargets();
+      setProfStatus('Saving…');
+      putProfiles().then(function(r){
+        if (r.ok){ $('newProfile').value=''; setProfStatus('Added "'+name+'".', true); }
+        else { customProfiles.pop(); renderProfiles(); rebuildTargets(); setProfStatus('Failed (HTTP '+r.status+').', false); }
+      }).catch(function(e){ customProfiles.pop(); renderProfiles(); rebuildTargets(); setProfStatus('Failed: '+e, false); });
+    });
+
+    $('newProfile').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); $('addProfile').click(); } });
+
+    $('profileList').addEventListener('click', function(e){
+      var btn = e.target.closest ? e.target.closest('.chip') : e.target;
+      if (!btn || !btn.getAttribute('data-name')) return;
+      var name = btn.getAttribute('data-name');
+      var idx = customProfiles.indexOf(name);
+      if (idx < 0) return;
+      var removed = customProfiles.splice(idx, 1)[0];
+      renderProfiles(); rebuildTargets();
+      setProfStatus('Saving…');
+      putProfiles().then(function(r){
+        if (r.ok){ setProfStatus('Removed "'+removed+'".', true); }
+        else { customProfiles.splice(idx, 0, removed); renderProfiles(); rebuildTargets(); setProfStatus('Failed (HTTP '+r.status+').', false); }
+      }).catch(function(err){ customProfiles.splice(idx, 0, removed); renderProfiles(); rebuildTargets(); setProfStatus('Failed: '+err, false); });
+    });
+
+    loadProfiles();
   </script>
 </body>
 </html>
