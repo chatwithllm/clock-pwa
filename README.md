@@ -77,6 +77,16 @@ docker exec clock-pwa /usr/local/bin/announce.sh "Movie starting" "Theater Room"
 > The admin page is **unauthenticated** — keep it on a trusted LAN, or put basic-auth in front of
 > `/admin.html` and the `PUT` on `/announce.json` if you expose it.
 
+### Custom profiles
+
+Built-in room profiles (Theater Room, Kitchen, …) cover most setups. To add
+your own (e.g. "Garage Gym"), open the admin page → **Custom profiles** →
+type a name → **Add**. Custom profiles are stored server-side
+(`/data/profiles.json`, written via authenticated WebDAV PUT) and appear in
+every device's Settings → Profile picker within ~15s, as well as in the
+announcement **Send to** list. Remove one with the ✕ on its chip. Built-in
+rooms are always available even if the file is empty or missing.
+
 ### Server-pushed weather (for devices with no internet)
 
 For displays on an isolated LAN/VLAN with **no internet of their own**, the container fetches
