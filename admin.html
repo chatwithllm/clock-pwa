@@ -91,13 +91,15 @@
 
     var $ = function(id){ return document.getElementById(id); };
 
+    function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
     // (Re)build the target dropdown from All + builtins + customs, preserving selection.
     var sel = $('target');
     function rebuildTargets(){
       var prev = sel.value;
       var all = BUILTINS.concat(customProfiles);
       sel.innerHTML = '<option value="all">All displays</option>' +
-        all.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
+        all.map(function(p){ return '<option value="'+esc(p)+'">'+esc(p)+'</option>'; }).join('');
       if (prev){ sel.value = prev; }
     }
     rebuildTargets();
@@ -151,7 +153,7 @@
     function renderProfiles(){
       $('profileList').innerHTML = customProfiles.length
         ? customProfiles.map(function(p){
-            return '<button class="chip" type="button" data-name="'+p.replace(/"/g,'&quot;')+'">'+p+' ✕</button>';
+            return '<button class="chip" type="button" data-name="'+esc(p)+'">'+esc(p)+' ✕</button>';
           }).join('')
         : '<span class="hint" style="margin:0">No custom profiles yet. Built-in rooms are always available.</span>';
     }
