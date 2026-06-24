@@ -54,17 +54,26 @@ unchanged route):
 
 ### Write semantics (append + trim)
 
-On every send (admin page and `announce.sh`):
-1. GET the current `announce.json` (tolerate 404/empty/non-array → start
-   from `[]`).
+**Admin page (primary path):** on send,
+1. GET the current `announce.json` (tolerate 404/empty/non-array → `[]`).
 2. Append the new entry.
-3. **Trim**: drop entries whose `ts/1000 + duration` is already in the past
-   (expired), then cap to the **last 20** entries.
+3. **Trim**: drop entries whose `ts/1000 + duration` is already past
+   (expired), then cap to the **last 20**.
 4. PUT the resulting array.
 
-**Clear / dismiss all** → PUT `[]`.
+**`announce.sh` (manual in-container helper):** reads the current
+`/data/announce.json`, appends the new entry, and writes the array back.
+Pure `sh` (alpine has no `jq`), so it does **append only** — no
+time-trim/cap. This is acceptable because the device filters to live
+entries on render regardless, and the admin page (the primary path) keeps
+the file bounded. The helper tolerates a missing/empty/legacy-object file
+by starting from `[]`.
 
-Single-admin use; the read-modify-write race is acceptable (documented).
+**Clear / dismiss all** (admin) → PUT `[]`.
+
+The device never relies on server-side trimming: it always recomputes the
+live set on render. Single-admin use; the read-modify-write race is
+acceptable (documented).
 
 ## Device display rules (js/app.js)
 
