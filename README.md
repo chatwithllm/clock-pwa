@@ -69,8 +69,9 @@ by tap / Enter / Escape, auto-hiding after its duration), exactly as before. Whe
 messages are queued, the newest appears centered as a card while the rest stack in a top-right
 notification tray (Apple-style), oldest at the top, each auto-dismissing on its own duration;
 the tray is capped at 4 visible items and shows a **+N more** chip for any overflow. Sends via the
-admin page append entries to `announce.json` (a JSON array); **Clear all** or an individual dismiss
-removes entries and the change is reflected on every device within the next poll cycle.
+admin page append entries to `announce.json` (a JSON array); **Clear all** empties it for every
+device within the next poll cycle. Dismissing a message on a display is local to that device (it
+stays hidden there for the rest of its duration); other displays keep showing it until it expires.
 
 Under the hood the admin page `PUT`s `announce.json` via nginx WebDAV — no extra backend. The CLI
 helper does the same:
