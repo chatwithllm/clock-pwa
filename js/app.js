@@ -527,6 +527,11 @@ function renderAnnounce(view){
     $('announceText').textContent = c.text;
     const sub = announceSub(c);
     $('announceSub').textContent = sub ? ('— ' + sub) : '';
+    const img = $('announceImage');
+    if (img){
+      if (c.image){ img.hidden = false; img.src = c.image; }
+      else { img.hidden = true; img.removeAttribute('src'); }
+    }
     el.dataset.id = c.id;
     el.hidden = false;
 
@@ -540,7 +545,10 @@ function renderAnnounce(view){
       if (view.moreCount > 0) html += '<div class="toast toast-more">+' + view.moreCount + ' more</div>';
       for (const a of view.stack){
         const s = announceSub(a);
-        html += '<div class="toast"><span class="toast-icon">' + escHtml(a.icon || '📢') + '</span>'
+        const lead = a.image
+          ? '<img class="toast-thumb" src="' + escHtml(a.image) + '" alt="" onerror="this.style.display=\'none\'">'
+          : '<span class="toast-icon">' + escHtml(a.icon || '📢') + '</span>';
+        html += '<div class="toast">' + lead
               + '<span class="toast-text">' + escHtml(a.text)
               + (s ? ('<span class="toast-sub">— ' + escHtml(s) + '</span>') : '')
               + '</span></div>';
