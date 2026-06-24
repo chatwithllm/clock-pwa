@@ -123,8 +123,8 @@ export class SunArc {
   /**
    * @param {{sunrise:string, sunset:string, now?:number, portrait?:boolean}} data
    * Pass naive-local ISO strings (as Open-Meteo returns with timezone=auto).
-   * `now` defaults to Date.now(). When it's night AND `portrait` is true, the dome
-   * collapses to a compact one-liner to free vertical space for the clock.
+   * `now` defaults to Date.now(). At night (sun below horizon) the dome collapses
+   * to a compact one-liner in both orientations to free the wasted space.
    */
   update(data){
     if (!this.svg || !data) { this.hide(); return; }
@@ -138,9 +138,9 @@ export class SunArc {
     const p = Math.max(0, Math.min(1, raw));
     const isNight = raw < 0 || raw > 1;
 
-    // Night + portrait → compact: short viewBox, single "next sunrise" line. The
-    // shorter SVG collapses the weather block so the stage (clock) cell grows.
-    const compact = isNight && !!data.portrait;
+    // At night the dome conveys nothing, so collapse it to a single "next sunrise"
+    // line in BOTH orientations (frees the wasted space). Day keeps the full arc.
+    const compact = isNight;
     this.svg.classList.toggle('is-compact', compact);
     if (compact){
       this.svg.setAttribute('viewBox', '0 0 200 30');
