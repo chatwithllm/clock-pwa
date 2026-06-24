@@ -472,8 +472,8 @@ async function pollProfiles(){
     const r = await fetch('profiles.json?ts=' + Date.now(), { cache:'no-store' });
     if (!r.ok) return;
     const j = await r.json();
-    const list = (j && Array.isArray(j.profiles)) ? j.profiles : [];
-    app._customProfiles = list.map(function(x){ return String(x).trim(); }).filter(Boolean);
+    if (!j || !Array.isArray(j.profiles)) return; // corrupt shape — keep cached value
+    app._customProfiles = j.profiles.map(function(x){ return String(x).trim(); }).filter(Boolean);
     try { localStorage.setItem(PROFILES_KEY, JSON.stringify(app._customProfiles)); } catch(_){}
     syncButtons();
   } catch(_) { /* offline / no file — keep cached value */ }
