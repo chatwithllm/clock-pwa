@@ -278,8 +278,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 }
 .city-status{font-size:clamp(12px,2.4vmin,16px);color:var(--fg-dim);min-height:1.2em}
 
-/* Hidden wake-lock video (off-screen, 1px) */
-.wl-video{position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px;z-index:-1}
+/* Keep-awake fallback video: kept ON-screen but tiny + near-invisible. iOS pauses
+   off-screen / opacity:0 videos, which would defeat the keep-awake hack. */
+.wl-video{position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.012;
+  pointer-events:none;z-index:-1;border:0}
 
 /* Reduced motion: kill the shift transition entirely */
 @media (prefers-reduced-motion: reduce){

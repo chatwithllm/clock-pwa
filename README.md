@@ -276,8 +276,17 @@ US defaults: **°F** and **12-hour**, both switchable live.
 ## Always-on / burn-in protection
 
 - **Wake Lock** keeps the screen on (phones), re-acquired on `visibilitychange`. Where Wake Lock
-  is missing it falls back to a hidden muted looping inline video. On **TV it no-ops** (no video hack).
+  is missing it falls back to a hidden muted looping inline **H.264 MP4** video (iOS can't play
+  WebM). On **TV it no-ops** (no video hack). Tap once to see the **status dot** in the control band:
+  green *Awake* = held, amber *May sleep* = not held.
 - **Near-black dark theme** default; no large bright static fills.
+
+> **Keeping an iPhone awake.** A PWA can't match a native app's idle-timer control — it relies on
+> the Wake Lock API, which needs all of: **HTTPS** (blocked on plain `http://<LAN-IP>`),
+> **iOS 16.4+**, the app **in the foreground**, and **Low Power Mode off**. For a guaranteed
+> always-on kiosk, also set **iOS → Settings → Display & Brightness → Auto-Lock → Never** and keep
+> the device on power. The MP4 video fallback helps over plain HTTP / older iOS, but HTTPS + Wake
+> Lock is the reliable path. If the status dot is amber, one of the conditions above isn't met.
 - **Pixel-shift** nudges the whole layout every 60s within the title-safe inset slack, so burn-in
   shifting never reaches a true screen edge.
 - **`prefers-reduced-motion`** disables both the analog second-hand sweep and the pixel-shift.
