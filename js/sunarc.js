@@ -100,6 +100,11 @@ export class SunArc {
     svg.appendChild(this.setLabel);
     svg.appendChild(this.statusLabel);
 
+    // Compact one-liner shown at night in portrait (the dome is useless after dark).
+    this.compact = el('text', { class:'sunarc-compact', x:CX, y:19, 'text-anchor':'middle',
+      'font-size':'12', fill:'var(--fg-dim)', 'font-family':'system-ui,sans-serif', 'letter-spacing':'1' });
+    svg.appendChild(this.compact);
+
     this.container.textContent = '';
     this.container.appendChild(svg);
     this.svg = svg;
@@ -116,9 +121,10 @@ export class SunArc {
   show(){ if (this.container) this.container.hidden = false; }
 
   /**
-   * @param {{sunrise:string, sunset:string, now?:number}} data
+   * @param {{sunrise:string, sunset:string, now?:number, portrait?:boolean}} data
    * Pass naive-local ISO strings (as Open-Meteo returns with timezone=auto).
-   * `now` defaults to Date.now(); override for testing arbitrary times.
+   * `now` defaults to Date.now(). When it's night AND `portrait` is true, the dome
+   * collapses to a compact one-liner to free vertical space for the clock.
    */
   update(data){
     if (!this.svg || !data) { this.hide(); return; }
@@ -131,6 +137,17 @@ export class SunArc {
     const raw = (now - rise) / (set - rise);
     const p = Math.max(0, Math.min(1, raw));
     const isNight = raw < 0 || raw > 1;
+
+    // Night + portrait → compact: short viewBox, single "next sunrise" line. The
+    // shorter SVG collapses the weather block so the stage (clock) cell grows.
+    const compact = isNight && !!data.portrait;
+    this.svg.classList.toggle('is-compact', compact);
+    if (compact){
+      this.svg.setAttribute('viewBox', '0 0 200 30');
+      this.compact.textContent = '☾  Sunrise ' + this._fmt(rise);
+      return;
+    }
+    this.svg.setAttribute('viewBox', `0 0 ${VBW} ${VBH}`);
 
     // Sun position (rest at the near horizon when below it).
     const pt = arcPoint(p);

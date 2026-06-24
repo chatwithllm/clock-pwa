@@ -213,6 +213,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 /* Below-horizon: dim the sun, cool the warm arc */
 .sunarc-svg.is-night .sunarc-sun{opacity:.35}
 .sunarc-svg.is-night{--sun:#8aa0c8}
+/* Compact night-portrait mode: hide the dome, show only the one-liner, and
+   shrink the SVG box itself so the weather block frees real estate for the clock */
+.sunarc-svg.is-compact{height:clamp(20px,5vmin,32px)}
+.sunarc-svg.is-compact > *:not(.sunarc-compact){display:none}
+.sunarc-svg:not(.is-compact) .sunarc-compact{display:none}
 @media (prefers-reduced-motion: reduce){
   .sunarc-sun{transition:none}
   .sunarc-core{animation:none}

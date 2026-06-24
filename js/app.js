@@ -112,6 +112,15 @@ function applyOrientation(){
   el.classList.toggle('force-portrait', o === 'portrait');
   el.classList.toggle('force-landscape', o === 'landscape');
   // 'auto' => neither class => CSS @media reacts to the device automatically.
+  try { updateSun(); } catch(_){}   // compact sun-arc depends on effective orientation
+}
+
+// Effective portrait: honor a forced orientation setting, else the device.
+function isEffectivePortrait(){
+  const o = app.settings && app.settings.orientation;
+  if (o === 'portrait') return true;
+  if (o === 'landscape') return false;
+  try { return window.matchMedia('(orientation:portrait)').matches; } catch(_){ return true; }
 }
 
 // ---------- Dynamic display (weather-tinted text + animated backdrop) ----------
@@ -220,7 +229,7 @@ function updateSun(){
     if (!app.sun) return;
     if (!app.settings.sunArc){ app.sun.hide(); return; } // gated by the Sun-arc setting
     const w = app.lastWeather;
-    if (w && w.sunrise && w.sunset) app.sun.update({ sunrise: w.sunrise, sunset: w.sunset });
+    if (w && w.sunrise && w.sunset) app.sun.update({ sunrise: w.sunrise, sunset: w.sunset, portrait: isEffectivePortrait() });
     else app.sun.hide();
   } catch(_){}
 }
@@ -559,6 +568,8 @@ async function boot(){
   app.weatherTimer = setInterval(refreshWeather, 15*60*1000);
   // Move the sun along its arc once a minute (CSS eases the transition).
   app.sunTimer = setInterval(updateSun, 60000);
+  // Re-evaluate compact sun-arc on rotation (portrait <-> landscape).
+  try { window.addEventListener('resize', updateSun, { passive:true }); } catch(_){}
 
   setState(REST);
   registerSW();
