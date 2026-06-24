@@ -27,10 +27,33 @@ const SECOND_ZONES = [
 ];
 const SERVERLOC_KEY = 'clockpwa.serverloc.v1';
 
-// Device room profiles (cycle in Settings; targets announcements + future behavior).
-const PROFILES = ['None','Theater Room','Study Room','Kitchen','Living Room','Bedroom','Office','Garage'];
+// Built-in device room profiles. Custom ones are fetched from /profiles.json
+// (admin-managed) and merged in; built-ins always present even if that's empty.
+const BUILTINS = ['Theater Room','Study Room','Kitchen','Living Room','Bedroom','Office','Garage'];
+const PROFILES_KEY = 'clockpwa.profiles.v1';
 const ANNOUNCE_SEEN_KEY = 'clockpwa.announceSeen';
 const ANNOUNCE_POLL_MS = 15000;
+
+// Effective Profile cycle list: None + builtins + admin customs (deduped,
+// case-insensitive). The device's current value is appended if missing so a
+// custom that was removed admin-side still cycles instead of getting stuck.
+function effectiveProfiles(){
+  const out = [];
+  const seen = new Set();
+  const push = (name) => {
+    const v = String(name == null ? '' : name).trim();
+    if (!v) return;
+    const k = v.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k); out.push(v);
+  };
+  push('None');
+  BUILTINS.forEach(push);
+  (app._customProfiles || []).forEach(push);
+  const cur = (app.settings && app.settings.profile) || 'None';
+  push(cur);
+  return out;
+}
 
 // ---- State machine (explicit reducer) ----
 const REST = 'REST', ACTIVE = 'ACTIVE', PANEL = 'PANEL';
@@ -41,6 +64,7 @@ const app = {
   nav: null,
   wake: null,
   isTV: false,
+  _customProfiles: [],
   reduceMotion: false,
   state: REST,
   idleTimer: null,
@@ -440,6 +464,21 @@ async function pollAnnounce(){
   } catch(_) { /* offline / no file — ignore */ }
 }
 
+// Fetch the admin-managed custom profile list (network-first); cache to
+// localStorage so it survives offline. Never throws.
+async function pollProfiles(){
+  if (typeof fetch !== 'function') return;
+  try {
+    const r = await fetch('profiles.json?ts=' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !Array.isArray(j.profiles)) return; // corrupt shape — keep cached value
+    app._customProfiles = j.profiles.map(function(x){ return String(x).trim(); }).filter(Boolean);
+    try { localStorage.setItem(PROFILES_KEY, JSON.stringify(app._customProfiles)); } catch(_){}
+    syncButtons();
+  } catch(_) { /* offline / no file — keep cached value */ }
+}
+
 function showAnnouncement(j, secondsLeft){
   try {
     const el = $('announce'); if (!el) return;
@@ -520,8 +559,9 @@ function wireControls(){
     persist(); applyTimeSource(); syncButtons();
   });
   $('setProfile').addEventListener('click', () => {
-    const i = PROFILES.indexOf(app.settings.profile);
-    app.settings.profile = PROFILES[(i + 1) % PROFILES.length] || 'None';
+    const list = effectiveProfiles();
+    const i = list.indexOf(app.settings.profile);
+    app.settings.profile = list[(i + 1) % list.length] || 'None';
     persist(); syncButtons();
   });
   $('announceClose').addEventListener('click', dismissAnnounce);
@@ -711,14 +751,19 @@ async function boot(){
     document.addEventListener('visibilitychange', () => { if (!document.hidden) syncServerTime(); });
   } catch(_){}
 
+  // Custom profiles: load cached list, then fetch fresh + poll alongside announcements.
+  try {
+    app._customProfiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]') || [];
+  } catch(_) { app._customProfiles = []; }
+
   // Announcements: poll the server for broadcasts (now + every 15s + on refocus).
   try {
     app._announceSeen = localStorage.getItem(ANNOUNCE_SEEN_KEY) || '';
   } catch(_) { app._announceSeen = ''; }
   try {
-    pollAnnounce();
-    app.announceTimer = setInterval(pollAnnounce, ANNOUNCE_POLL_MS);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAnnounce(); });
+    pollAnnounce(); pollProfiles();
+    app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); }, ANNOUNCE_POLL_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); } });
   } catch(_){}
 
   setState(REST);

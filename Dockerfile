@@ -18,6 +18,7 @@ RUN chmod +x /usr/local/bin/announce.sh
 # Writable data dir so the admin page can PUT announce.json (WebDAV) and the
 # helper can write it. nginx workers run as the `nginx` user → own /data.
 COPY announce.json /data/announce.json
+COPY profiles.json /data/profiles.json
 RUN mkdir -p /data/tmp && chown -R nginx:nginx /data && chmod -R u+rwX /data
 COPY css   /usr/share/nginx/html/css
 COPY js    /usr/share/nginx/html/js
