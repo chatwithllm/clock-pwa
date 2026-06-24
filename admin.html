@@ -112,9 +112,26 @@
 
     function setStatus(msg, ok){ var s=$('status'); s.textContent=msg; s.className='status '+(ok===true?'ok':ok===false?'err':''); }
 
-    function put(obj){
+    // announce.json is a queue (array). Reads tolerate 404/legacy-object/corrupt.
+    function getQueue(){
+      return fetch('announce.json?ts=' + Date.now(), { cache:'no-store' })
+        .then(function(r){ return r.ok ? r.json() : []; })
+        .then(function(j){ return Array.isArray(j) ? j : (j && j.id && j.text ? [j] : []); })
+        .catch(function(){ return []; });
+    }
+    // Drop expired entries, then cap to the last 20.
+    function trimQueue(arr){
+      var now = Date.now();
+      var live = arr.filter(function(a){
+        if (!a || !a.id) return false;
+        var dur = Number(a.duration) > 0 ? Number(a.duration) : 20;
+        return !a.ts || (now - Number(a.ts)) / 1000 < dur;
+      });
+      return live.slice(-20);
+    }
+    function putQueue(arr){
       return fetch('announce.json', {
-        method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj)
+        method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(arr)
       });
     }
 
@@ -128,7 +145,9 @@
         duration: dur, target: $('target').value || 'all'
       };
       setStatus('Sending…');
-      put(obj).then(function(r){
+      getQueue().then(function(q){
+        return putQueue(trimQueue(q.concat([obj])));
+      }).then(function(r){
         if (r.ok) setStatus('Sent to ' + obj.target + ' — displays will show it within ~15s.', true);
         else setStatus('Failed (HTTP ' + r.status + '). Is WebDAV PUT allowed?', false);
       }).catch(function(e){ setStatus('Failed: ' + e, false); });
@@ -136,7 +155,7 @@
 
     $('clear').addEventListener('click', function(){
       setStatus('Clearing…');
-      put({ id:'', text:'', ts:0, duration:20, target:'all' }).then(function(r){
+      putQueue([]).then(function(r){
         setStatus(r.ok ? 'Cleared.' : 'Failed (HTTP '+r.status+').', r.ok);
       }).catch(function(e){ setStatus('Failed: ' + e, false); });
     });
