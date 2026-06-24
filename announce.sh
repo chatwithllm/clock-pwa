@@ -7,7 +7,7 @@
 # Run inside the container, e.g.:
 #   docker exec clock-pwa /usr/local/bin/announce.sh "Dinner is ready!"
 #   docker exec clock-pwa /usr/local/bin/announce.sh "Movie starting" "Theater Room" 30
-ROOT=/usr/share/nginx/html
+ROOT=/data
 TEXT="$1"
 TARGET="${2:-all}"
 DUR="${3:-20}"

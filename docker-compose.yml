@@ -11,11 +11,10 @@ services:
       CLOCK_LAT: "39.7684"
       CLOCK_LON: "-86.1581"
       CLOCK_CITY: "Indianapolis"
-    volumes:
-      # Broadcast announcements by editing this file on the host (or use the helper:
-      #   docker exec clock-pwa /usr/local/bin/announce.sh "message" [target] [secs])
-      - ./announce.json:/usr/share/nginx/html/announce.json
-      # Alternative to the env vars above: mount + live-edit config.json instead
-      # (don't use both — a read-only mount can't be overwritten by the env step).
-      # - ./config.json:/usr/share/nginx/html/config.json
+    # Announcements are sent from the admin page (http://<host>:8080/admin.html)
+    # or the helper (docker exec clock-pwa /usr/local/bin/announce.sh "msg"); they
+    # write the in-container /data/announce.json (no host mount needed).
+    # volumes:
+    #   # Alternative to the env vars above: mount + live-edit config.json instead.
+    #   - ./config.json:/usr/share/nginx/html/config.json
     restart: unless-stopped

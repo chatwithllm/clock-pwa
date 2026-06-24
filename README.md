@@ -61,20 +61,21 @@ Give each display a **profile** (its room) in **Settings → Profile** (Theater 
 Room, …; or `?profile=Kitchen`). Profiles are the basis for room-specific behavior — the first use
 is **announcements**.
 
-**Broadcast a message to the displays** with the helper (writes `announce.json`, which every device
-polls every ~15 s and shows as a banner, dismissable by tap / Enter / Escape, auto-hiding after the
-duration):
+**Broadcast a message** the easy way — the **admin page** at **`http://<host>:8080/admin.html`**:
+type a message, pick a target (All or a room), duration, optional icon, and hit *Send*. Every device
+polls every ~15 s and shows it as a banner (dismissable by tap / Enter / Escape, auto-hiding after
+the duration). A display only shows messages targeted to `all` or **its own profile**.
+
+Under the hood the admin page `PUT`s `announce.json` via nginx WebDAV — no extra backend. The CLI
+helper does the same:
 
 ```bash
-# to ALL devices for 20s:
 docker exec clock-pwa /usr/local/bin/announce.sh "Dinner is ready!"
-# to one room for 30s:
 docker exec clock-pwa /usr/local/bin/announce.sh "Movie starting" "Theater Room" 30
 ```
 
-`announce.json` is mounted from the host, so you can also edit it directly (bump `id` to re-fire).
-Set `target` to `all` or a profile name. A display only shows messages targeted to `all` or its own
-profile.
+> The admin page is **unauthenticated** — keep it on a trusted LAN, or put basic-auth in front of
+> `/admin.html` and the `PUT` on `/announce.json` if you expose it.
 
 ### Server-pushed weather (for devices with no internet)
 

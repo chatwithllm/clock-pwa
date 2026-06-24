@@ -8,11 +8,16 @@ RUN apk add --no-cache curl
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy ONLY the app files into the web root (not the Docker/readme files)
-COPY index.html manifest.webmanifest sw.js config.json announce.json /usr/share/nginx/html/
+COPY index.html admin.html manifest.webmanifest sw.js config.json /usr/share/nginx/html/
 
 # Broadcast helper: `docker exec clock-pwa /usr/local/bin/announce.sh "message"`
 COPY announce.sh /usr/local/bin/announce.sh
 RUN chmod +x /usr/local/bin/announce.sh
+
+# Writable data dir so the admin page can PUT announce.json (WebDAV) and the
+# helper can write it. nginx workers run as the `nginx` user → own /data.
+COPY announce.json /data/announce.json
+RUN mkdir -p /data/tmp && chown -R nginx:nginx /data && chmod -R u+rwX /data
 COPY css   /usr/share/nginx/html/css
 COPY js    /usr/share/nginx/html/js
 COPY icons /usr/share/nginx/html/icons
