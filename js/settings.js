@@ -13,14 +13,14 @@ export const DEFAULT_LOCATION = {
 // US-friendly defaults.
 const DEFAULTS = {
   mode: 'digital',      // 'digital' | 'analog'
-  clockStyle: 'classic',// digital STYLE id (distinct from mode): 'classic' | 'block'
+  clockStyle: 'classic',// digital STYLE id (distinct from mode): 'classic' | 'block' (default Classic)
   orientation: 'auto',  // 'auto' | 'portrait' | 'landscape' (auto => follow device)
-  display: 'plain',     // 'plain' | 'dynamic' (dynamic => weather-tinted text + animated backdrop)
+  display: 'dynamic',   // 'plain' | 'dynamic' (default Dynamic: weather-tinted text + animated backdrop)
   sunArc: true,         // show the sunrise→sunset sun-position arc in the weather card
   hour24: false,        // false => 12h (US default)
   seconds: true,
   date: true,
-  night: false,         // night-dim schedule enabled
+  night: true,          // night-dim schedule enabled by default (dim at night, burn-in safe)
   nightStart: 21,       // hour (local) dim turns on
   nightEnd: 7,          // hour (local) dim turns off
   locationMode: 'server', // 'server' (use /config.json) | 'custom' (lat/lon below)

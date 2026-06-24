@@ -1,8 +1,8 @@
 // sw.js — cache-first app shell; network-first w/ cache fallback for Open-Meteo.
 // Registers only over HTTPS/localhost (browsers block SW on plain-http LAN IPs).
 
-const SHELL = 'clockpwa-shell-v9';
-const RUNTIME = 'clockpwa-runtime-v9';
+const SHELL = 'clockpwa-shell-v10';
+const RUNTIME = 'clockpwa-runtime-v10';
 
 const SHELL_FILES = [
   './',

@@ -531,7 +531,8 @@ async function boot(){
   try {
     app.settings = loadSettings();
   } catch(_) {
-    app.settings = { mode:'digital', hour24:false, seconds:true, date:true, night:false,
+    app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
+                     sunArc:true, hour24:false, seconds:true, date:true, night:true,
                      nightStart:21, nightEnd:7, locationMode:'server', secondTz:'off',
                      lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
   }
