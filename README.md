@@ -84,6 +84,15 @@ docker exec clock-pwa /usr/local/bin/announce.sh "Movie starting" "Theater Room"
 > The admin page is **unauthenticated** — keep it on a trusted LAN, or put basic-auth in front of
 > `/admin.html` and the `PUT` on `/announce.json` if you expose it.
 
+Announcements can now carry **rich media**. Attach an **image or GIF** via the admin page (the file
+is stored on the container at `/uploads/`, so it works on offline LAN displays) or paste an external
+URL — it appears below the message text in the card and as a small thumbnail in the notification
+stack; a broken or missing URL degrades gracefully to text-only. You can also attach a **notification
+chime** (choose Ding, Alert, or Chime) that plays once when the announcement appears — the tone is
+synthesized in-browser, so no audio files are needed. Because browsers require a user gesture before
+playing audio, each display must enable sound once via **Settings → Sound**; that preference is saved
+in `localStorage` and persists across reloads.
+
 ### Custom profiles
 
 Built-in room profiles (Theater Room, Kitchen, …) cover most setups. To add

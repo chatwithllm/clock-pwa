@@ -1,8 +1,8 @@
 // sw.js — cache-first app shell; network-first w/ cache fallback for Open-Meteo.
 // Registers only over HTTPS/localhost (browsers block SW on plain-http LAN IPs).
 
-const SHELL = 'clockpwa-shell-v13';
-const RUNTIME = 'clockpwa-runtime-v13';
+const SHELL = 'clockpwa-shell-v15';
+const RUNTIME = 'clockpwa-runtime-v15';
 
 const SHELL_FILES = [
   './',
@@ -64,6 +64,18 @@ self.addEventListener('fetch', (e) => {
         caches.open(RUNTIME).then((c) => c.put(req, copy)).catch(()=>{});
         return res;
       }).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Uploaded media: immutable filenames — cache-first, populate runtime cache.
+  if (url.pathname.startsWith('/uploads/')){
+    e.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(RUNTIME).then((c) => c.put(req, copy)).catch(()=>{});
+        return res;
+      }))
     );
     return;
   }

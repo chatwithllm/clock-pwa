@@ -19,7 +19,7 @@ RUN chmod +x /usr/local/bin/announce.sh
 # helper can write it. nginx workers run as the `nginx` user → own /data.
 COPY announce.json /data/announce.json
 COPY profiles.json /data/profiles.json
-RUN mkdir -p /data/tmp && chown -R nginx:nginx /data && chmod -R u+rwX /data
+RUN mkdir -p /data/tmp /data/uploads && chown -R nginx:nginx /data && chmod -R u+rwX /data
 COPY css   /usr/share/nginx/html/css
 COPY js    /usr/share/nginx/html/js
 COPY icons /usr/share/nginx/html/icons

@@ -172,6 +172,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .toast-text{font-size:15px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
 .toast-sub{display:block;margin-top:2px;font-size:12px;font-weight:500;color:var(--fg-dim);letter-spacing:.03em}
 .toast-more{justify-content:center;font-size:13px;color:var(--fg-dim);font-weight:600}
+/* Announcement image (center card) + toast thumbnail */
+.announce-img{display:block;margin-top:12px;max-width:100%;max-height:38vh;
+  object-fit:contain;border-radius:10px}
+.announce-img[hidden]{display:none}
+.toast-thumb{width:40px;height:40px;flex:0 0 auto;object-fit:cover;border-radius:8px}
 @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
 /* Card mode: center announcement goes non-modal (no dim backdrop) when 2+ live */
 .announce.announce--card{background:transparent;place-items:start center;pointer-events:none}

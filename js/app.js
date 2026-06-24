@@ -69,6 +69,8 @@ const app = {
   _announceQueue: [],
   _announceDismissed: null,
   _announceModal: false,
+  _audioCtx: null,
+  _soundedIds: null,
   reduceMotion: false,
   state: REST,
   idleTimer: null,
@@ -380,6 +382,7 @@ function syncButtons(){
   $('setSeconds').textContent = s.seconds ? 'On' : 'Off';
   $('setDate').textContent = s.date ? 'On' : 'Off';
   $('setNight').textContent = s.night ? 'On' : 'Off';
+  $('setSound').textContent = (app.settings && app.settings.soundEnabled) ? 'On' : 'Off';
   syncDimButton();
 }
 function syncDimButton(){
@@ -499,6 +502,44 @@ function pruneDismissed(){
       if (!ids.has(id)){ app._announceDismissed.delete(id); changed = true; }
     }
     if (changed) persistDismissed();
+    if (app._soundedIds){
+      for (const id of Array.from(app._soundedIds)){
+        if (!ids.has(id)) app._soundedIds.delete(id);
+      }
+    }
+  } catch(_){}
+}
+
+// ---- Notification chimes (synthesized; no audio files) ----
+function ensureAudio(){
+  try {
+    if (!app._audioCtx){
+      const C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      app._audioCtx = new C();
+    }
+    if (app._audioCtx.state === 'suspended') app._audioCtx.resume();
+    return app._audioCtx;
+  } catch(_) { return null; }
+}
+function chimeTone(ctx, freq, startOffset, dur){
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  o.connect(g); g.connect(ctx.destination);
+  const t0 = ctx.currentTime + startOffset;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.3, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function playChime(name){
+  if (!name || name === 'none') return;
+  if (!(app.settings && app.settings.soundEnabled)) return;
+  const ctx = ensureAudio(); if (!ctx) return;
+  try {
+    if (name === 'ding'){ chimeTone(ctx, 880, 0, 0.15); }
+    else if (name === 'alert'){ chimeTone(ctx, 660, 0, 0.12); chimeTone(ctx, 660, 0.2, 0.12); }
+    else if (name === 'chime'){ chimeTone(ctx, 523, 0, 0.12); chimeTone(ctx, 659, 0.12, 0.12); chimeTone(ctx, 784, 0.24, 0.14); }
   } catch(_){}
 }
 
@@ -527,8 +568,17 @@ function renderAnnounce(view){
     $('announceText').textContent = c.text;
     const sub = announceSub(c);
     $('announceSub').textContent = sub ? ('— ' + sub) : '';
+    const img = $('announceImage');
+    if (img){
+      if (c.image){ img.hidden = false; img.src = c.image; }
+      else { img.hidden = true; img.removeAttribute('src'); }
+    }
     el.dataset.id = c.id;
     el.hidden = false;
+    if (c.sound && app._soundedIds && !app._soundedIds.has(c.id)){
+      app._soundedIds.add(c.id);
+      playChime(c.sound);
+    }
 
     const multi = view.stack.length > 0 || view.moreCount > 0;
     if (multi){
@@ -540,7 +590,10 @@ function renderAnnounce(view){
       if (view.moreCount > 0) html += '<div class="toast toast-more">+' + view.moreCount + ' more</div>';
       for (const a of view.stack){
         const s = announceSub(a);
-        html += '<div class="toast"><span class="toast-icon">' + escHtml(a.icon || '📢') + '</span>'
+        const lead = a.image
+          ? '<img class="toast-thumb" src="' + escHtml(a.image) + '" alt="" onerror="this.style.display=\'none\'">'
+          : '<span class="toast-icon">' + escHtml(a.icon || '📢') + '</span>';
+        html += '<div class="toast">' + lead
               + '<span class="toast-text">' + escHtml(a.text)
               + (s ? ('<span class="toast-sub">— ' + escHtml(s) + '</span>') : '')
               + '</span></div>';
@@ -634,6 +687,11 @@ function wireControls(){
   $('setSeconds').addEventListener('click', () => { app.settings.seconds = !app.settings.seconds; persist(); applyClockOptions(); syncButtons(); });
   $('setDate').addEventListener('click', () => { app.settings.date = !app.settings.date; persist(); applyClockOptions(); syncButtons(); });
   $('setNight').addEventListener('click', () => { app.settings.night = !app.settings.night; persist(); syncButtons(); checkNightSchedule(); });
+  $('setSound').addEventListener('click', () => {
+    app.settings.soundEnabled = !app.settings.soundEnabled;
+    if (app.settings.soundEnabled){ ensureAudio(); playChime('ding'); }
+    persist(); syncButtons();
+  });
   $('setOrient').addEventListener('click', () => {
     const order = ['auto','portrait','landscape'];
     const i = order.indexOf(app.settings.orientation);
@@ -865,6 +923,7 @@ async function boot(){
     app._announceDismissed = new Set(JSON.parse(localStorage.getItem(ANNOUNCE_DISMISSED_KEY) || '[]') || []);
   } catch(_) { app._announceDismissed = new Set(); }
   app._announceQueue = [];
+  app._soundedIds = new Set();
   try {
     pollAnnounce(); pollProfiles();
     app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); }, ANNOUNCE_POLL_MS);
