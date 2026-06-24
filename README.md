@@ -55,6 +55,20 @@ In the app, **Settings → Location → Server** uses this. Devices that can't g
 boxes on a VLAN with no internet GPS) get the location from the server this way. A user can switch
 **Location → Custom** and enter their own **US ZIP** (e.g. `46204`) or a **city name** instead.
 
+### Server-pushed weather (for devices with no internet)
+
+For displays on an isolated LAN/VLAN with **no internet of their own**, the container fetches
+weather **on the server** and writes it to `weather.json`; those devices read it from this server
+(same origin) instead of calling Open-Meteo themselves.
+
+- The server needs internet; the **display devices do not**.
+- It uses the same server location (`CLOCK_LAT/LON` or `config.json`), refreshes every 15 min
+  (override with `WEATHER_INTERVAL` seconds), and is **on by default**. Disable with
+  `WEATHER_FETCH=off`.
+- Devices in **Location → Server** mode prefer `weather.json` automatically (and fall back to the
+  direct API, then cache). **Custom**-location devices use the direct API (they need internet for
+  their own location).
+
 **One-click install:** because `localhost` is a secure context, the service worker registers
 and Chrome/Edge show an **install icon** in the address bar — click it to install the PWA (or
 on a phone over real HTTPS, *Add to Home Screen*). The nginx config serves the manifest with the

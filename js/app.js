@@ -4,7 +4,7 @@
 
 import { loadSettings, saveSettings, DEFAULT_LOCATION } from './settings.js';
 import { Clock, sampleFPS } from './clock.js';
-import { getWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache } from './weather.js';
+import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache } from './weather.js';
 import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX, paletteForCode } from './weatherfx.js';
@@ -232,7 +232,12 @@ function effectiveLocation(){
 async function refreshWeather(){
   try {
     const loc = effectiveLocation();
-    const w = await getWeather(loc);
+    let w = null;
+    // Server-location devices prefer server-pushed weather.json — works on LAN
+    // devices WITHOUT internet. Custom location uses the direct API. Either way
+    // falls back to the other, then to cache; the clock is never affected.
+    if (app.settings.locationMode === 'server') w = await getServerWeather(loc);
+    if (!w) w = await getWeather(loc);
     if (w){
       app.lastWeather = w; paintWeather(w);
       if (app.fx && isDynamic()){ app.fx.setCondition(w.code); if (!app.deepDim) applyTint(w.code); }

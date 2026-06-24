@@ -50,9 +50,31 @@ async function fetchJSON(url, ms = 12000){
   }
 }
 
+// Normalize an Open-Meteo forecast JSON (direct API or server-pushed weather.json).
+function normalizeForecast(j, loc){
+  const cur = j.current || {};
+  const daily = j.daily || {};
+  return {
+    tempC: cur.temperature_2m,
+    feelsC: cur.apparent_temperature,
+    code: cur.weather_code,
+    hiC: daily.temperature_2m_max ? daily.temperature_2m_max[0] : null,
+    loC: daily.temperature_2m_min ? daily.temperature_2m_min[0] : null,
+    // Sunrise/sunset are naive ISO strings in the LOCATION's timezone (timezone=auto).
+    sunrise: daily.sunrise ? daily.sunrise[0] : null,
+    sunset: daily.sunset ? daily.sunset[0] : null,
+    utcOffsetSec: (typeof j.utc_offset_seconds === 'number') ? j.utc_offset_seconds : null,
+    city: (loc && loc.city) || null,
+    lat: loc && loc.lat, lon: loc && loc.lon,
+    ts: Date.now(),
+    stale: false,
+  };
+}
+
 /**
- * Fetch current weather. Returns normalized object and caches it.
- * On failure, returns last cached value flagged stale (or null if none).
+ * Fetch current weather DIRECTLY from Open-Meteo (needs internet on the device).
+ * Returns normalized object and caches it. On failure, returns last cached value
+ * flagged stale (or null if none).
  * @param {{lat:number,lon:number,city?:string}} loc
  */
 export async function getWeather(loc){
@@ -61,24 +83,7 @@ export async function getWeather(loc){
     + `&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset`
     + `&temperature_unit=celsius&timezone=auto&forecast_days=1`;
   try {
-    const j = await fetchJSON(url);
-    const cur = j.current || {};
-    const daily = j.daily || {};
-    const data = {
-      tempC: cur.temperature_2m,
-      feelsC: cur.apparent_temperature,
-      code: cur.weather_code,
-      hiC: daily.temperature_2m_max ? daily.temperature_2m_max[0] : null,
-      loC: daily.temperature_2m_min ? daily.temperature_2m_min[0] : null,
-      // Sunrise/sunset are naive ISO strings in the LOCATION's timezone (timezone=auto).
-      sunrise: daily.sunrise ? daily.sunrise[0] : null,
-      sunset: daily.sunset ? daily.sunset[0] : null,
-      utcOffsetSec: (typeof j.utc_offset_seconds === 'number') ? j.utc_offset_seconds : null,
-      city: loc.city || null,
-      lat: loc.lat, lon: loc.lon,
-      ts: Date.now(),
-      stale: false,
-    };
+    const data = normalizeForecast(await fetchJSON(url), loc);
     saveCache(data);
     return data;
   } catch (err) {
@@ -86,6 +91,21 @@ export async function getWeather(loc){
     if (cached){ return Object.assign({}, cached, { stale:true }); }
     return null;
   }
+}
+
+/**
+ * Read SERVER-PUSHED weather (./weather.json written by the host). Same-origin, so
+ * it works on LAN devices WITHOUT internet. Returns null if absent/unfetched yet.
+ * @param {{city?:string,lat?:number,lon?:number}} loc  labels the result
+ */
+export async function getServerWeather(loc){
+  try {
+    const j = await fetchJSON('weather.json', 8000);
+    if (!j || !j.current) return null;
+    const data = normalizeForecast(j, loc || {});
+    saveCache(data);
+    return data;
+  } catch (_) { return null; }
 }
 
 // Geocode a city name → {lat,lon,city}. Touch-only convenience; returns null on miss.
