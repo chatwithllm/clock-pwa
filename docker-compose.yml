@@ -11,9 +11,11 @@ services:
       CLOCK_LAT: "39.7684"
       CLOCK_LON: "-86.1581"
       CLOCK_CITY: "Indianapolis"
-    # Alternative to the env vars above: mount + live-edit a config.json instead
-    # (don't use both — a read-only mount can't be overwritten by the env step).
-    # Comment out the `environment:` block above if you use this.
-    # volumes:
-    #   - ./config.json:/usr/share/nginx/html/config.json
+    volumes:
+      # Broadcast announcements by editing this file on the host (or use the helper:
+      #   docker exec clock-pwa /usr/local/bin/announce.sh "message" [target] [secs])
+      - ./announce.json:/usr/share/nginx/html/announce.json
+      # Alternative to the env vars above: mount + live-edit config.json instead
+      # (don't use both — a read-only mount can't be overwritten by the env step).
+      # - ./config.json:/usr/share/nginx/html/config.json
     restart: unless-stopped

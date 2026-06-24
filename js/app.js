@@ -27,6 +27,11 @@ const SECOND_ZONES = [
 ];
 const SERVERLOC_KEY = 'clockpwa.serverloc.v1';
 
+// Device room profiles (cycle in Settings; targets announcements + future behavior).
+const PROFILES = ['None','Theater Room','Study Room','Kitchen','Living Room','Bedroom','Office','Garage'];
+const ANNOUNCE_SEEN_KEY = 'clockpwa.announceSeen';
+const ANNOUNCE_POLL_MS = 15000;
+
 // ---- State machine (explicit reducer) ----
 const REST = 'REST', ACTIVE = 'ACTIVE', PANEL = 'PANEL';
 
@@ -342,6 +347,7 @@ function syncButtons(){
   $('setSecond').textContent = sz ? sz.label : 'Off';
   $('setLocMode').textContent = s.locationMode === 'custom' ? 'Custom' : 'Server';
   $('setTime').textContent = s.timeSource === 'server' ? 'Server' : 'Device';
+  $('setProfile').textContent = s.profile || 'None';
   $('setHour').textContent = s.hour24 ? '24h' : '12h';
   $('setSeconds').textContent = s.seconds ? 'On' : 'Off';
   $('setDate').textContent = s.date ? 'On' : 'Off';
@@ -409,6 +415,55 @@ function applyClockOptions(){
   });
 }
 
+// ---------- Announcements (server-pushed broadcast) ----------
+// Poll announce.json (network-first); when a NEW announcement targets this device
+// (target 'all' or matches the profile) and isn't stale, show the overlay.
+async function pollAnnounce(){
+  if (typeof fetch !== 'function') return;
+  try {
+    const r = await fetch('announce.json?ts=' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.id || !j.text) return;
+    if (j.id === app._announceSeen) return;
+    const target = String(j.target || 'all');
+    const prof = (app.settings.profile || 'None');
+    if (target.toLowerCase() !== 'all' && target.toLowerCase() !== prof.toLowerCase()){
+      app._announceSeen = j.id; return;                 // not for this device
+    }
+    const dur = Number(j.duration) > 0 ? Number(j.duration) : 20;
+    const ageSec = j.ts ? (Date.now() - Number(j.ts)) / 1000 : 0;
+    if (ageSec > dur + 10){ app._announceSeen = j.id; return; }   // stale, don't pop on load
+    showAnnouncement(j, Math.max(4, Math.round(dur - ageSec)));
+    app._announceSeen = j.id;
+    try { localStorage.setItem(ANNOUNCE_SEEN_KEY, j.id); } catch(_){}
+  } catch(_) { /* offline / no file — ignore */ }
+}
+
+function showAnnouncement(j, secondsLeft){
+  try {
+    const el = $('announce'); if (!el) return;
+    $('announceIcon').textContent = j.icon || '📢';
+    $('announceText').textContent = j.text;
+    const from = (j.from || (j.target && j.target !== 'all' ? j.target : '')) ;
+    $('announceSub').textContent = from ? ('— ' + from) : '';
+    el.hidden = false;
+    // Make it remote-operable: scope D-pad to the overlay and focus Dismiss.
+    if (app.nav){ app.nav.setScope(el); app.nav.focusFirst(); }
+    if (app._announceTimer) clearTimeout(app._announceTimer);
+    app._announceTimer = setTimeout(dismissAnnounce, secondsLeft * 1000);
+  } catch(_){}
+}
+
+function dismissAnnounce(){
+  try {
+    const el = $('announce'); if (!el || el.hidden) return;
+    el.hidden = true;
+    if (app._announceTimer){ clearTimeout(app._announceTimer); app._announceTimer = null; }
+    if (app.nav) app.nav.setScope(app.state === PANEL ? $('panel') : document);
+  } catch(_){}
+}
+
 // ---------- Wiring ----------
 function wireControls(){
   // Chrome band
@@ -464,6 +519,13 @@ function wireControls(){
     app.settings.timeSource = app.settings.timeSource === 'server' ? 'device' : 'server';
     persist(); applyTimeSource(); syncButtons();
   });
+  $('setProfile').addEventListener('click', () => {
+    const i = PROFILES.indexOf(app.settings.profile);
+    app.settings.profile = PROFILES[(i + 1) % PROFILES.length] || 'None';
+    persist(); syncButtons();
+  });
+  $('announceClose').addEventListener('click', dismissAnnounce);
+  $('announce').addEventListener('click', (e) => { if (e.target === $('announce')) dismissAnnounce(); });
   $('setClose').addEventListener('click', () => setState(ACTIVE));
 
   $('setCityGo').addEventListener('click', doCitySearch);
@@ -522,7 +584,10 @@ function wireInput(){
   document.addEventListener('keydown', handler, true);
 
   app.nav = new DpadNav({
-    onEscape: () => { if (app.state === PANEL) setState(ACTIVE); },
+    onEscape: () => {
+      if ($('announce') && !$('announce').hidden){ dismissAnnounce(); return; }
+      if (app.state === PANEL) setState(ACTIVE);
+    },
     onActivate: () => { if (app.state === ACTIVE) resetIdle(); },
   });
 }
@@ -562,7 +627,7 @@ async function boot(){
   } catch(_) {
     app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
                      sunArc:true, hour24:false, seconds:true, date:true, night:true,
-                     nightStart:21, nightEnd:7, locationMode:'server', timeSource:'device', secondTz:'off',
+                     nightStart:21, nightEnd:7, locationMode:'server', timeSource:'device', profile:'None', secondTz:'off',
                      lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
   }
 
@@ -644,6 +709,16 @@ async function boot(){
     applyTimeSource();
     app.timeTimer = setInterval(syncServerTime, 5*60*1000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) syncServerTime(); });
+  } catch(_){}
+
+  // Announcements: poll the server for broadcasts (now + every 15s + on refocus).
+  try {
+    app._announceSeen = localStorage.getItem(ANNOUNCE_SEEN_KEY) || '';
+  } catch(_) { app._announceSeen = ''; }
+  try {
+    pollAnnounce();
+    app.announceTimer = setInterval(pollAnnounce, ANNOUNCE_POLL_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAnnounce(); });
   } catch(_){}
 
   setState(REST);

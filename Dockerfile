@@ -8,7 +8,11 @@ RUN apk add --no-cache curl
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy ONLY the app files into the web root (not the Docker/readme files)
-COPY index.html manifest.webmanifest sw.js config.json /usr/share/nginx/html/
+COPY index.html manifest.webmanifest sw.js config.json announce.json /usr/share/nginx/html/
+
+# Broadcast helper: `docker exec clock-pwa /usr/local/bin/announce.sh "message"`
+COPY announce.sh /usr/local/bin/announce.sh
+RUN chmod +x /usr/local/bin/announce.sh
 COPY css   /usr/share/nginx/html/css
 COPY js    /usr/share/nginx/html/js
 COPY icons /usr/share/nginx/html/icons

@@ -112,6 +112,10 @@
       </div>
 
       <div class="row">
+        <span class="row-label">Profile</span>
+        <button class="ctrl" id="setProfile" type="button" data-nav>None</button>
+      </div>
+      <div class="row">
         <span class="row-label">Location</span>
         <button class="ctrl" id="setLocMode" type="button" data-nav>Server</button>
       </div>
@@ -133,6 +137,18 @@
         <button class="ctrl" id="setGeo" type="button" data-nav>Use my location</button>
         <button class="ctrl ctrl-primary" id="setClose" type="button" data-nav>Close</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Server-pushed announcement overlay -->
+  <div class="announce" id="announce" role="alertdialog" aria-modal="true" aria-label="Announcement" hidden>
+    <div class="announce-box">
+      <span class="announce-icon" id="announceIcon" aria-hidden="true">📢</span>
+      <div class="announce-body">
+        <div class="announce-text" id="announceText"></div>
+        <div class="announce-sub" id="announceSub"></div>
+      </div>
+      <button class="ctrl ctrl-primary announce-close" id="announceClose" type="button" data-nav>Dismiss</button>
     </div>
   </div>
 

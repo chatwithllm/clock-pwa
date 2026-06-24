@@ -25,6 +25,7 @@ const DEFAULTS = {
   nightEnd: 7,          // hour (local) dim turns off
   locationMode: 'server', // 'server' (use /config.json) | 'custom' (lat/lon below)
   timeSource: 'device', // 'device' (own clock) | 'server' (sync to host clock)
+  profile: 'None',      // device room profile (Theater Room / Kitchen / …) for targeting + future room behavior
   secondTz: 'off',      // secondary-clock zone id (see SECOND_ZONES in app.js)
   lat: null,            // CUSTOM location (set via ZIP/city/geolocation/URL)
   lon: null,
@@ -60,6 +61,8 @@ function readURL(){
     if (loc === 'server' || loc === 'custom') out.locationMode = loc;
     const tsrc = (q.get('time') || '').toLowerCase();
     if (tsrc === 'device' || tsrc === 'server') out.timeSource = tsrc;
+    const prof = q.get('profile');
+    if (prof) out.profile = prof;
     const second = q.get('second');
     if (second) out.secondTz = second.toLowerCase();
     const sun = (q.get('sun') || '').toLowerCase();
@@ -101,7 +104,7 @@ export function saveSettings(s){
   const out = {
     mode: s.mode, clockStyle: s.clockStyle, orientation: s.orientation, display: s.display, sunArc: s.sunArc, hour24: s.hour24, seconds: s.seconds, date: s.date,
     night: s.night, nightStart: s.nightStart, nightEnd: s.nightEnd,
-    locationMode: s.locationMode, timeSource: s.timeSource, secondTz: s.secondTz,
+    locationMode: s.locationMode, timeSource: s.timeSource, profile: s.profile, secondTz: s.secondTz,
     lat: s.lat, lon: s.lon, city: s.city,
   };
   safeLSSet(LS_KEY, JSON.stringify(out));

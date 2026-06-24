@@ -55,6 +55,27 @@ In the app, **Settings → Location → Server** uses this. Devices that can't g
 boxes on a VLAN with no internet GPS) get the location from the server this way. A user can switch
 **Location → Custom** and enter their own **US ZIP** (e.g. `46204`) or a **city name** instead.
 
+### Device profiles + announcements
+
+Give each display a **profile** (its room) in **Settings → Profile** (Theater Room, Kitchen, Study
+Room, …; or `?profile=Kitchen`). Profiles are the basis for room-specific behavior — the first use
+is **announcements**.
+
+**Broadcast a message to the displays** with the helper (writes `announce.json`, which every device
+polls every ~15 s and shows as a banner, dismissable by tap / Enter / Escape, auto-hiding after the
+duration):
+
+```bash
+# to ALL devices for 20s:
+docker exec clock-pwa /usr/local/bin/announce.sh "Dinner is ready!"
+# to one room for 30s:
+docker exec clock-pwa /usr/local/bin/announce.sh "Movie starting" "Theater Room" 30
+```
+
+`announce.json` is mounted from the host, so you can also edit it directly (bump `id` to re-fire).
+Set `target` to `all` or a profile name. A display only shows messages targeted to `all` or its own
+profile.
+
 ### Server-pushed weather (for devices with no internet)
 
 For displays on an isolated LAN/VLAN with **no internet of their own**, the container fetches
