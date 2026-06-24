@@ -98,6 +98,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 /* ---- Regions ---- */
 .stage{grid-area:stage;min-width:0;min-height:0;display:grid;place-items:center;
   padding:clamp(4px,2.4vmin,40px)} /* min:0 lets it shrink below content; padding gives the clock air */
+/* Landscape: trim the stage padding so the hero clock fills more width (TV-safe
+   outer inset is preserved on .app, this only trims the inner cell padding). */
+@media (orientation:landscape){ .stage{padding:clamp(2px,1vmin,14px)} }
+.app.force-landscape .stage{padding:clamp(2px,1vmin,14px)}
 .weather{grid-area:weather;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:flex-start}
 
 /* Landscape: weather lays out as a centered horizontal footer strip.
