@@ -61,6 +61,13 @@
         </div>
       </div>
 
+      <label for="imgFile">Image / GIF (optional)</label>
+      <div class="row">
+        <div style="flex:2"><input id="imgFile" type="file" accept="image/*"></div>
+        <div style="flex:2"><input id="imgUrl" type="text" placeholder="…or paste an image URL"></div>
+      </div>
+      <img id="imgPreview" alt="" hidden style="max-height:120px;margin-top:8px;border-radius:8px">
+
       <div class="actions">
         <button class="go" id="send">Send announcement</button>
         <button class="ghost" id="clear">Clear / dismiss all</button>
@@ -112,6 +119,17 @@
 
     function setStatus(msg, ok){ var s=$('status'); s.textContent=msg; s.className='status '+(ok===true?'ok':ok===false?'err':''); }
 
+    $('imgFile').addEventListener('change', function(){
+      var f = this.files && this.files[0];
+      var p = $('imgPreview');
+      if (f){ p.src = URL.createObjectURL(f); p.hidden = false; $('imgUrl').value = ''; }
+      else { p.hidden = true; p.removeAttribute('src'); }
+    });
+    $('imgUrl').addEventListener('input', function(){
+      var u = this.value.trim(), p = $('imgPreview');
+      if (u && !($('imgFile').files && $('imgFile').files[0])){ p.src = u; p.hidden = false; }
+    });
+
     // announce.json is a queue (array). Reads tolerate 404/legacy-object/corrupt.
     function getQueue(){
       return fetch('announce.json?ts=' + Date.now(), { cache:'no-store' })
@@ -135,6 +153,23 @@
       });
     }
 
+    // Upload the chosen image (if any) and resolve to its path, else the URL, else ''.
+    function resolveImage(){
+      var f = $('imgFile').files && $('imgFile').files[0];
+      if (f){
+        if (f.size > 8 * 1024 * 1024) return Promise.reject(new Error('image too large (max 8 MB)'));
+        var ext = (f.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'img';
+        var name = String(Date.now()) + '-' + Math.floor(Math.random() * 100000) + '.' + ext;
+        return fetch('uploads/' + name, {
+          method: 'PUT', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f
+        }).then(function(r){
+          if (!r.ok) throw new Error(r.status === 413 ? 'image too large (max 8 MB)' : 'upload HTTP ' + r.status);
+          return '/uploads/' + name;
+        });
+      }
+      return Promise.resolve($('imgUrl').value.trim());
+    }
+
     $('send').addEventListener('click', function(){
       var text = $('msg').value.trim();
       if (!text){ setStatus('Enter a message first.', false); return; }
@@ -145,12 +180,19 @@
         duration: dur, target: $('target').value || 'all'
       };
       setStatus('Sending…');
-      getQueue().then(function(q){
+      resolveImage().then(function(image){
+        if (image) obj.image = image;
+        return getQueue();
+      }).then(function(q){
         return putQueue(trimQueue(q.concat([obj])));
       }).then(function(r){
-        if (r.ok) setStatus('Sent to ' + obj.target + ' — displays will show it within ~15s.', true);
-        else setStatus('Failed (HTTP ' + r.status + '). Is WebDAV PUT allowed?', false);
-      }).catch(function(e){ setStatus('Failed: ' + e, false); });
+        if (r.ok){
+          setStatus('Sent to ' + obj.target + ' — displays will show it within ~15s.', true);
+          $('imgFile').value = ''; $('imgUrl').value = ''; $('imgPreview').hidden = true;
+        } else {
+          setStatus('Failed (HTTP ' + r.status + '). Is WebDAV PUT allowed?', false);
+        }
+      }).catch(function(e){ setStatus('Failed: ' + (e && e.message ? e.message : e), false); });
     });
 
     $('clear').addEventListener('click', function(){
