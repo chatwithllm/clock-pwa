@@ -51,13 +51,14 @@ async function fetchJSON(url, ms = 12000){
 }
 
 // Normalize an Open-Meteo forecast JSON (direct API or server-pushed weather.json).
-function normalizeForecast(j, loc){
+export function normalizeForecast(j, loc){
   const cur = j.current || {};
   const daily = j.daily || {};
   return {
     tempC: cur.temperature_2m,
     feelsC: cur.apparent_temperature,
     code: cur.weather_code,
+    rh: cur.relative_humidity_2m,
     hiC: daily.temperature_2m_max ? daily.temperature_2m_max[0] : null,
     loC: daily.temperature_2m_min ? daily.temperature_2m_min[0] : null,
     // Sunrise/sunset are naive ISO strings in the LOCATION's timezone (timezone=auto).
@@ -79,7 +80,7 @@ function normalizeForecast(j, loc){
  */
 export async function getWeather(loc){
   const url = `${FORECAST}?latitude=${loc.lat}&longitude=${loc.lon}`
-    + `&current=temperature_2m,apparent_temperature,weather_code`
+    + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code`
     + `&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset`
     + `&temperature_unit=celsius&timezone=auto&forecast_days=1`;
   try {

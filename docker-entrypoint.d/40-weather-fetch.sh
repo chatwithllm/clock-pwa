@@ -26,7 +26,7 @@ fetch_loop() {
   while true; do
     LAT=$(coord lat); LON=$(coord lon)
     if [ -n "$LAT" ] && [ -n "$LON" ]; then
-      URL="https://api.open-meteo.com/v1/forecast?latitude=$LAT&longitude=$LON&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&temperature_unit=celsius&timezone=auto&forecast_days=1"
+      URL="https://api.open-meteo.com/v1/forecast?latitude=$LAT&longitude=$LON&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&temperature_unit=celsius&timezone=auto&forecast_days=1"
       if curl -fsS --max-time 15 "$URL" -o "$ROOT/weather.json.tmp" && [ -s "$ROOT/weather.json.tmp" ]; then
         mv "$ROOT/weather.json.tmp" "$ROOT/weather.json"
         echo "clock: weather.json updated ($LAT,$LON)"
