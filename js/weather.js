@@ -151,3 +151,24 @@ export function bothTemps(c){
   const f = fF(c), cc = fC(c);
   return { f: f == null ? '--' : ''+f, c: cc == null ? '--' : ''+cc };
 }
+
+// Weather for a SECOND/secondary location (direct Open-Meteo; needs device internet).
+// Cached per-zone so the badge keeps its color offline. Never throws.
+export async function getZoneWeather(zone){
+  if (!zone || !Number.isFinite(zone.lat) || !Number.isFinite(zone.lon)) return null;
+  const key = 'clockpwa.weather2.' + zone.id;
+  const loc = { lat:zone.lat, lon:zone.lon, city:zone.city || zone.label };
+  const url = `${FORECAST}?latitude=${loc.lat}&longitude=${loc.lon}`
+    + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code`
+    + `&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset`
+    + `&temperature_unit=celsius&timezone=auto&forecast_days=1`;
+  try {
+    const data = normalizeForecast(await fetchJSON(url), loc);
+    safeLSSet(key, JSON.stringify(data));
+    return data;
+  } catch (_) {
+    const raw = safeLSGet(key);
+    if (raw){ try { return Object.assign(JSON.parse(raw), { stale:true }); } catch(__){} }
+    return null;
+  }
+}

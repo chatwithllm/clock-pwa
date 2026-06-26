@@ -4,7 +4,7 @@
 
 import { loadSettings, saveSettings, DEFAULT_LOCATION } from './settings.js';
 import { Clock, sampleFPS, setClockOffset, nowDate } from './clock.js';
-import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache } from './weather.js';
+import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache, getZoneWeather } from './weather.js';
 import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX } from './weatherfx.js';
@@ -17,14 +17,14 @@ const $ = (id) => document.getElementById(id);
 const SECOND_ZONES = [
   { id:'off',    label:'Off' },
   { id:'utc',    label:'UTC',          tz:'UTC' },
-  { id:'nyc',    label:'New York',     tz:'America/New_York' },
-  { id:'chi',    label:'Chicago',      tz:'America/Chicago' },
-  { id:'la',     label:'Los Angeles',  tz:'America/Los_Angeles' },
-  { id:'london', label:'London',       tz:'Europe/London' },
-  { id:'paris',  label:'Paris',        tz:'Europe/Paris' },
-  { id:'india',  label:'India',        tz:'Asia/Kolkata' },
-  { id:'tokyo',  label:'Tokyo',        tz:'Asia/Tokyo' },
-  { id:'sydney', label:'Sydney',       tz:'Australia/Sydney' },
+  { id:'nyc',    label:'New York',     tz:'America/New_York',   lat:40.7128, lon:-74.0060, city:'New York' },
+  { id:'chi',    label:'Chicago',      tz:'America/Chicago',    lat:41.8781, lon:-87.6298, city:'Chicago' },
+  { id:'la',     label:'Los Angeles',  tz:'America/Los_Angeles',lat:34.0522, lon:-118.2437, city:'Los Angeles' },
+  { id:'london', label:'London',       tz:'Europe/London',      lat:51.5074, lon:-0.1278, city:'London' },
+  { id:'paris',  label:'Paris',        tz:'Europe/Paris',       lat:48.8566, lon:2.3522, city:'Paris' },
+  { id:'india',  label:'India',        tz:'Asia/Kolkata',       lat:28.6139, lon:77.2090, city:'New Delhi' },
+  { id:'tokyo',  label:'Tokyo',        tz:'Asia/Tokyo',         lat:35.6762, lon:139.6503, city:'Tokyo' },
+  { id:'sydney', label:'Sydney',       tz:'Australia/Sydney',   lat:-33.8688, lon:151.2093, city:'Sydney' },
 ];
 const SERVERLOC_KEY = 'clockpwa.serverloc.v1';
 
@@ -79,6 +79,7 @@ const app = {
   weatherTimer: null,
   nightTimer: null,
   lastWeather: null,
+  secondWeather: null,
   deepDim: false,
 };
 
@@ -419,6 +420,17 @@ function updateSecondClock(){
   } catch(_){}
 }
 
+// Fetch weather for the active second zone (own-location color for the badge).
+async function refreshSecondWeather(){
+  try {
+    const z = SECOND_ZONES.find(x => x.id === app.settings.secondTz);
+    if (!z || !Number.isFinite(z.lat)){ app.secondWeather = null; updateSecondClock(); return; }
+    const w = await getZoneWeather(z);
+    app.secondWeather = w || null;
+    updateSecondClock();
+  } catch(_) { app.secondWeather = null; }
+}
+
 // Reflect wake-lock state in the chrome-band indicator. Hidden where it doesn't
 // apply (TV / unsupported); green "Awake" when held, amber when the screen may sleep.
 function updateWakeIndicator(status){
@@ -712,7 +724,7 @@ function wireControls(){
     const ids = SECOND_ZONES.map(z => z.id);
     const i = ids.indexOf(app.settings.secondTz);
     app.settings.secondTz = ids[(i + 1) % ids.length] || 'off';
-    persist(); updateSecondClock(); syncButtons();
+    persist(); updateSecondClock(); refreshSecondWeather(); syncButtons();
   });
   $('setLocMode').addEventListener('click', () => {
     app.settings.locationMode = app.settings.locationMode === 'server' ? 'custom' : 'server';
@@ -888,6 +900,7 @@ async function boot(){
 
   // Secondary clock (subtle; updates every second). Hidden unless a zone is chosen.
   try { updateSecondClock(); app.secondTimer = setInterval(updateSecondClock, 1000); } catch(_){}
+  refreshSecondWeather();
 
   // Server-provided location (/config.json) — seeds 'server' mode before first fetch.
   try { await loadServerConfig(); } catch(_){}
@@ -902,7 +915,7 @@ async function boot(){
     }
   } catch(_){}
   refreshWeather();
-  app.weatherTimer = setInterval(refreshWeather, 15*60*1000);
+  app.weatherTimer = setInterval(() => { refreshWeather(); refreshSecondWeather(); }, 15*60*1000);
   // Move the sun along its arc once a minute (CSS eases the transition).
   app.sunTimer = setInterval(updateSun, 60000);
   // Re-evaluate compact sun-arc on rotation (portrait <-> landscape).
