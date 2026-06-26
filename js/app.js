@@ -7,7 +7,8 @@ import { Clock, sampleFPS, setClockOffset, nowDate } from './clock.js';
 import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache } from './weather.js';
 import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
-import { WeatherFX, paletteForCode } from './weatherfx.js';
+import { WeatherFX } from './weatherfx.js';
+import { weatherColor } from './feelcolor.js';
 import { SunArc } from './sunarc.js';
 
 const $ = (id) => document.getElementById(id);
@@ -184,8 +185,9 @@ function clearTint(){
   const r = document.documentElement;
   for (const v of TINT_VARS) r.style.removeProperty(v);
 }
-function applyTint(code){
-  const p = paletteForCode(code);
+function applyTint(w){
+  if (!w) return;
+  const p = weatherColor(w.tempC, w.rh);
   const r = document.documentElement;
   r.style.setProperty('--fg', p.fg);
   r.style.setProperty('--fg-dim', p.dim);
@@ -199,7 +201,7 @@ function applyDisplay(){
   if (!app.fx) return;
   if (isDynamic()){
     app.fx.setActive(true);
-    if (app.lastWeather){ app.fx.setCondition(app.lastWeather.code); if (!app.deepDim) applyTint(app.lastWeather.code); }
+    if (app.lastWeather){ app.fx.setCondition(app.lastWeather.code); if (!app.deepDim) applyTint(app.lastWeather); }
   } else {
     app.fx.setActive(false);
     clearTint();
@@ -215,7 +217,7 @@ function applyDim(on){
   // Dynamic backdrop pauses in deep-dim; night palette takes over the text tint.
   if (app.fx && isDynamic()){
     app.fx.setPaused(!!on);
-    if (on) clearTint(); else if (app.lastWeather) applyTint(app.lastWeather.code);
+    if (on) clearTint(); else if (app.lastWeather) applyTint(app.lastWeather);
   }
   syncDimButton();
 }
@@ -299,7 +301,7 @@ async function refreshWeather(){
     if (!w) w = await getWeather(loc);
     if (w){
       app.lastWeather = w; paintWeather(w);
-      if (app.fx && isDynamic()){ app.fx.setCondition(w.code); if (!app.deepDim) applyTint(w.code); }
+      if (app.fx && isDynamic()){ app.fx.setCondition(w.code); if (!app.deepDim) applyTint(w); }
       updateSun();
     }
     else paintWeatherError();
@@ -895,7 +897,7 @@ async function boot(){
     const cached = loadCache();
     if (cached){
       app.lastWeather = Object.assign({}, cached, {stale:true}); paintWeather(app.lastWeather);
-      if (app.fx && isDynamic()){ app.fx.setCondition(cached.code); if (!app.deepDim) applyTint(cached.code); }
+      if (app.fx && isDynamic()){ app.fx.setCondition(cached.code); if (!app.deepDim) applyTint(cached); }
       updateSun();
     }
   } catch(_){}
