@@ -293,16 +293,37 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   .sunarc-core{animation:none}
 }
 
-/* Secondary clock — small, subtle, top-right; never takes a grid cell */
-.second-clock{position:absolute;top:0;right:0;display:flex;align-items:baseline;
-  gap:clamp(4px,1vmin,9px);pointer-events:none;
-  padding:clamp(2px,1vmin,10px) clamp(6px,1.6vmin,16px);
-  font-size:clamp(11px,2vmin,17px);letter-spacing:.06em;color:var(--fg-dim);
-  font-variant-numeric:tabular-nums;max-width:55%;overflow:hidden;white-space:nowrap}
-.second-clock[hidden]{display:none}
-.sc-label{text-transform:uppercase;font-weight:600;opacity:.85}
-.sc-time{color:var(--fg)}
-.sc-day{font-size:.78em;opacity:.7}
+/* Secondary clock — corner badge, top-right */
+.second-clock{
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: calc(env(safe-area-inset-right, 0px) + 14px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(4px);
+  z-index: 5;
+  pointer-events: none;
+}
+.second-clock[hidden]{ display: none; }
+.second-clock .sc-time{
+  font-size: clamp(18px, 4vw, 30px);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--sfg, var(--fg, #e6e6e6));   /* own-weather color */
+}
+.second-clock .sc-meta{ display: flex; gap: 6px; align-items: baseline; }
+.second-clock .sc-label{ font-size: 11px; letter-spacing: .08em; opacity: .75; }
+.second-clock .sc-day{ font-size: 11px; opacity: .55; }
+.second-clock .sc-temp{
+  font-size: 12px;
+  opacity: .8;
+  color: var(--sfg, var(--fg, #e6e6e6));
+}
 
 /* Wake-lock status indicator (lives in the chrome band; shows when chrome is visible) */
 .wl-status{display:inline-flex;align-items:center;gap:.45em;font:inherit;

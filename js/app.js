@@ -417,6 +417,17 @@ function updateSecondClock(){
       else if (zoneYmd < localYmd) dayHint = '−1d';
     } catch(_){}
     $('secondDay').textContent = dayHint;
+    // Own-weather color for the badge digits + a tiny temp chip (Dynamic only).
+    const tempEl = $('secondTemp');
+    const w2 = app.secondWeather;
+    if (isDynamic() && w2 && Number.isFinite(w2.tempC) && !app.deepDim){
+      const p = weatherColor(w2.tempC, w2.rh);
+      el.style.setProperty('--sfg', p.fg);
+      if (tempEl){ tempEl.hidden = false; tempEl.textContent = bothTemps(w2.tempC).f + '°'; }
+    } else {
+      el.style.removeProperty('--sfg');
+      if (tempEl){ tempEl.hidden = true; tempEl.textContent = ''; }
+    }
   } catch(_){}
 }
 
