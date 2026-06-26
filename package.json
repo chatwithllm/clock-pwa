@@ -1,0 +1,8 @@
+{
+  "name": "clock-pwa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
