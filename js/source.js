@@ -7,6 +7,12 @@ export function sourceToModes(source){
     : { timeSource:'server', locationMode:'server' };
 }
 
+// Display "source" for a device with no stored unified value (pre-upgrade).
+// Mixed/local-leaning legacy modes show as 'local'; both-server shows 'server'.
+export function legacySource(timeSource, locationMode){
+  return (timeSource === 'server' && locationMode === 'server') ? 'server' : 'local';
+}
+
 // Decide whether an admin-pushed source.json should change the client.
 // file: parsed { mode, force } | null.  userSet: has the user manually chosen?
 // Returns { source, locked } to apply, or null for "no change".

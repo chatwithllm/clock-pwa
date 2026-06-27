@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sourceToModes, resolveServerSource } from '../js/source.js';
+import { sourceToModes, resolveServerSource, legacySource } from '../js/source.js';
 
 test('server maps to host time + server location', () => {
   assert.deepEqual(sourceToModes('server'), { timeSource:'server', locationMode:'server' });
@@ -22,4 +22,11 @@ test('default push applies only when the user has not chosen', () => {
 test('absent or malformed file means no server opinion', () => {
   assert.equal(resolveServerSource(null, false), null);
   assert.equal(resolveServerSource({ mode:'bogus' }, false), null);
+});
+
+test('legacySource: both server -> server', () => { assert.equal(legacySource('server','server'), 'server'); });
+test('legacySource: any non-both-server -> local', () => {
+  assert.equal(legacySource('device','server'), 'local');
+  assert.equal(legacySource('server','custom'), 'local');
+  assert.equal(legacySource('device','custom'), 'local');
 });

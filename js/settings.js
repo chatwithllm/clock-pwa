@@ -1,6 +1,8 @@
 // settings.js — load/save settings, read config from URL query params.
 // Tolerates localStorage being wiped: falls back to URL params, then defaults.
 
+import { legacySource } from './source.js';
+
 const LS_KEY = 'clockpwa.settings.v1';
 
 // Editable default location constant (precedence #4). Default: New York City.
@@ -101,6 +103,10 @@ export function loadSettings(){
   }
   // An explicit ?lat=&lon= in the URL means the user wants THAT location → custom mode.
   if (url.lat != null && url.locationMode == null) s.locationMode = 'custom';
+  // Was the unified Source explicitly chosen (URL or a prior user toggle persisted it)?
+  // If not, this is a pre-upgrade device: keep its stored modes and only DISPLAY a matching source.
+  s._sourceExplicit = (url.source != null) || (stored.source != null);
+  if (!s._sourceExplicit) s.source = legacySource(s.timeSource, s.locationMode);
   return s;
 }
 

@@ -223,6 +223,7 @@ function applyDim(on){
     app.fx.setPaused(!!on);
     if (on) clearTint(); else if (app.lastWeather) applyTint(app.lastWeather);
   }
+  try { updateSecondClock(); } catch(_){}
   syncDimButton();
 }
 
@@ -882,7 +883,7 @@ async function boot(){
   try {
     app.settings = loadSettings();
     app._sourceUserSet = !!app.settings.sourceUserSet;
-    try { const m = sourceToModes(app.settings.source); app.settings.timeSource = m.timeSource; app.settings.locationMode = m.locationMode; } catch(_){}
+    try { if (app.settings._sourceExplicit){ const m = sourceToModes(app.settings.source); app.settings.timeSource = m.timeSource; app.settings.locationMode = m.locationMode; } } catch(_){}
   } catch(_) {
     app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
                      sunArc:true, hour24:false, seconds:true, date:true, night:true,

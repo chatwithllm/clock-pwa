@@ -183,8 +183,8 @@ regardless of each device's clock — and it works on LAN with no internet (`?ti
 **Source (Settings → Source).** A unified **Server / Local** toggle sets both time and weather **authority**
 at once:
 - **Server** (default) — time from host clock + weather & location from `config.json` / `weather.json`.
-- **Local** — time from device clock + weather & location from the device's own Geolocation (or a
-  custom ZIP/city you enter).
+- **Local** — device clock + your own location (set via ZIP code, city search, or 'use my location');
+  until you set one it falls back to a default city.
 
 Admins can set a **default** source (applies on first load) or **force** the source globally via the
 admin page — when forced, each device's Source toggle is disabled and shows "Managed by server". The
