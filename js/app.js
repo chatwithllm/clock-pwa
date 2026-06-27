@@ -3,6 +3,7 @@
 // weather) NEVER blanks the clock.
 
 import { loadSettings, saveSettings, DEFAULT_LOCATION } from './settings.js';
+import { sourceToModes, resolveServerSource } from './source.js';
 import { Clock, sampleFPS, setClockOffset, nowDate } from './clock.js';
 import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache, getZoneWeather } from './weather.js';
 import { DpadNav } from './nav.js';
@@ -72,6 +73,8 @@ const app = {
   _announceModal: false,
   _audioCtx: null,
   _soundedIds: null,
+  _sourceUserSet: false,
+  _sourceLocked: false,
   reduceMotion: false,
   state: REST,
   idleTimer: null,
@@ -290,6 +293,15 @@ function applyTimeSource(){
   else setClockOffset(0);
 }
 
+// Apply the unified Source: set both underlying modes, then re-run their effects.
+function applySource(){
+  const { timeSource, locationMode } = sourceToModes(app.settings.source);
+  app.settings.timeSource = timeSource;
+  app.settings.locationMode = locationMode;
+  applyTimeSource();
+  refreshWeather();
+}
+
 // ---------- Weather ----------
 async function refreshWeather(){
   try {
@@ -378,8 +390,8 @@ function syncButtons(){
   $('setSun').textContent = s.sunArc ? 'On' : 'Off';
   const sz = SECOND_ZONES.find(z => z.id === s.secondTz);
   $('setSecond').textContent = sz ? sz.label : 'Off';
-  $('setLocMode').textContent = s.locationMode === 'custom' ? 'Custom' : 'Server';
-  $('setTime').textContent = s.timeSource === 'server' ? 'Server' : 'Device';
+  $('setSource').textContent = s.source === 'local' ? 'Local' : 'Server';
+  $('setSource').disabled = !!app._sourceLocked;
   $('setProfile').textContent = s.profile || 'None';
   $('setHour').textContent = s.hour24 ? '24h' : '12h';
   $('setSeconds').textContent = s.seconds ? 'On' : 'Off';
@@ -737,13 +749,11 @@ function wireControls(){
     app.settings.secondTz = ids[(i + 1) % ids.length] || 'off';
     persist(); updateSecondClock(); refreshSecondWeather(); syncButtons();
   });
-  $('setLocMode').addEventListener('click', () => {
-    app.settings.locationMode = app.settings.locationMode === 'server' ? 'custom' : 'server';
-    persist(); syncButtons(); refreshWeather();
-  });
-  $('setTime').addEventListener('click', () => {
-    app.settings.timeSource = app.settings.timeSource === 'server' ? 'device' : 'server';
-    persist(); applyTimeSource(); syncButtons();
+  $('setSource').addEventListener('click', () => {
+    if (app._sourceLocked) return;
+    app.settings.source = app.settings.source === 'server' ? 'local' : 'server';
+    app._sourceUserSet = true;
+    applySource(); persist(); syncButtons();
   });
   $('setProfile').addEventListener('click', () => {
     const list = effectiveProfiles();
@@ -851,10 +861,11 @@ function registerSW(){
 async function boot(){
   try {
     app.settings = loadSettings();
+    try { const m = sourceToModes(app.settings.source); app.settings.timeSource = m.timeSource; app.settings.locationMode = m.locationMode; } catch(_){}
   } catch(_) {
     app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
                      sunArc:true, hour24:false, seconds:true, date:true, night:true,
-                     nightStart:21, nightEnd:7, locationMode:'server', timeSource:'device', profile:'None', secondTz:'off',
+                     nightStart:21, nightEnd:7, source:'server', locationMode:'server', timeSource:'server', profile:'None', secondTz:'off',
                      lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
   }
 

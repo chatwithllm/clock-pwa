@@ -123,12 +123,12 @@
         <button class="ctrl" id="setProfile" type="button" data-nav>None</button>
       </div>
       <div class="row">
-        <span class="row-label">Location</span>
-        <button class="ctrl" id="setLocMode" type="button" data-nav>Server</button>
+        <span class="row-label">Source</span>
+        <button class="ctrl" id="setSource" type="button" data-nav>Server</button>
       </div>
-      <div class="row">
-        <span class="row-label">Time</span>
-        <button class="ctrl" id="setTime" type="button" data-nav>Device</button>
+      <div class="row" id="sourceManagedRow" hidden>
+        <span class="row-label"></span>
+        <span class="row-note" id="sourceManaged">Managed by server</span>
       </div>
       <div class="row row-col">
         <label class="row-label" for="setCity">Your location (ZIP or city)</label>

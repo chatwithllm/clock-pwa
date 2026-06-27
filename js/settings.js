@@ -23,6 +23,7 @@ const DEFAULTS = {
   night: true,          // night-dim schedule enabled by default (dim at night, burn-in safe)
   nightStart: 21,       // hour (local) dim turns on
   nightEnd: 7,          // hour (local) dim turns off
+  source: 'server',     // unified time+weather authority: 'server' | 'local'
   locationMode: 'server', // 'server' (use /config.json) | 'custom' (lat/lon below)
   timeSource: 'device', // 'device' (own clock) | 'server' (sync to host clock)
   profile: 'None',      // device room profile (Theater Room / Kitchen / …) for targeting + future room behavior
@@ -72,6 +73,8 @@ function readURL(){
     const h = q.get('hour');
     if (h === '24') out.hour24 = true;
     if (h === '12') out.hour24 = false;
+    const src = (q.get('source') || '').toLowerCase();
+    if (src === 'server' || src === 'local') out.source = src;
   } catch (_) {}
   return out;
 }
@@ -105,6 +108,7 @@ export function saveSettings(s){
   const out = {
     mode: s.mode, clockStyle: s.clockStyle, orientation: s.orientation, display: s.display, sunArc: s.sunArc, hour24: s.hour24, seconds: s.seconds, date: s.date,
     night: s.night, nightStart: s.nightStart, nightEnd: s.nightEnd,
+    source: s.source,
     locationMode: s.locationMode, timeSource: s.timeSource, profile: s.profile, secondTz: s.secondTz,
     soundEnabled: s.soundEnabled,
     lat: s.lat, lon: s.lon, city: s.city,
