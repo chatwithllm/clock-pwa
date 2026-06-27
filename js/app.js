@@ -483,6 +483,25 @@ function applyClockOptions(){
   });
 }
 
+// Poll the admin-managed Source authority (network-first). Applies force/default.
+async function pollSource(){
+  if (typeof fetch !== 'function') return;
+  try {
+    const r = await fetch('source.json?ts=' + Date.now(), { cache:'no-store' });
+    let file = null;
+    if (r.ok){ try { file = await r.json(); } catch(_){ file = null; } }
+    const decision = resolveServerSource(file, app._sourceUserSet);
+    const wasLocked = app._sourceLocked;
+    app._sourceLocked = !!(decision && decision.locked);
+    const row = $('sourceManagedRow'); if (row) row.hidden = !app._sourceLocked;
+    if (decision && app.settings.source !== decision.source){
+      app.settings.source = decision.source;
+      applySource(); persist();
+    }
+    if (app._sourceLocked !== wasLocked || decision) syncButtons();
+  } catch(_) { /* offline — keep current */ }
+}
+
 // ---------- Announcements (server-pushed broadcast) ----------
 // Minimal HTML escaper for text rendered via innerHTML (toast stack).
 function escHtml(s){
@@ -753,6 +772,7 @@ function wireControls(){
     if (app._sourceLocked) return;
     app.settings.source = app.settings.source === 'server' ? 'local' : 'server';
     app._sourceUserSet = true;
+    app.settings.sourceUserSet = true;
     applySource(); persist(); syncButtons();
   });
   $('setProfile').addEventListener('click', () => {
@@ -861,6 +881,7 @@ function registerSW(){
 async function boot(){
   try {
     app.settings = loadSettings();
+    app._sourceUserSet = !!app.settings.sourceUserSet;
     try { const m = sourceToModes(app.settings.source); app.settings.timeSource = m.timeSource; app.settings.locationMode = m.locationMode; } catch(_){}
   } catch(_) {
     app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
@@ -962,9 +983,9 @@ async function boot(){
   app._announceQueue = [];
   app._soundedIds = new Set();
   try {
-    pollAnnounce(); pollProfiles();
-    app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); }, ANNOUNCE_POLL_MS);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); } });
+    pollAnnounce(); pollProfiles(); pollSource();
+    app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); pollSource(); }, ANNOUNCE_POLL_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); pollSource(); } });
   } catch(_){}
 
   setState(REST);

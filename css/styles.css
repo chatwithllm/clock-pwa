@@ -383,3 +383,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 @media (prefers-reduced-motion: reduce){
   .app{transition:none}
 }
+
+.row-note{ font-size: 12px; opacity: .6; font-style: italic; }
+.ctrl:disabled{ opacity: .5; cursor: not-allowed; }

@@ -25,10 +25,11 @@ const DEFAULTS = {
   nightEnd: 7,          // hour (local) dim turns off
   source: 'server',     // unified time+weather authority: 'server' | 'local'
   locationMode: 'server', // 'server' (use /config.json) | 'custom' (lat/lon below)
-  timeSource: 'device', // 'device' (own clock) | 'server' (sync to host clock)
+  timeSource: 'server', // 'device' (own clock) | 'server' (sync to host clock)
   profile: 'None',      // device room profile (Theater Room / Kitchen / …) for targeting + future room behavior
   secondTz: 'off',      // secondary-clock zone id (see SECOND_ZONES in app.js)
   soundEnabled: false,  // notification chimes (requires a one-time enable gesture per device)
+  sourceUserSet: false, // true once the user has explicitly toggled the Source button
   lat: null,            // CUSTOM location (set via ZIP/city/geolocation/URL)
   lon: null,
   city: null,
@@ -111,6 +112,7 @@ export function saveSettings(s){
     source: s.source,
     locationMode: s.locationMode, timeSource: s.timeSource, profile: s.profile, secondTz: s.secondTz,
     soundEnabled: s.soundEnabled,
+    sourceUserSet: s.sourceUserSet,
     lat: s.lat, lon: s.lon, city: s.city,
   };
   safeLSSet(LS_KEY, JSON.stringify(out));
