@@ -180,6 +180,18 @@ displays disagree if their clocks aren't synced. *Server* syncs every display to
 (read from the HTTP `Date` header, round-trip corrected), so a whole fleet shows the **same time**
 regardless of each device's clock — and it works on LAN with no internet (`?time=server` to preset).
 
+**Source (Settings → Source).** A unified **Server / Local** toggle sets both time and weather **authority**
+at once:
+- **Server** (default) — time from host clock + weather & location from `config.json` / `weather.json`.
+- **Local** — time from device clock + weather & location from the device's own Geolocation (or a
+  custom ZIP/city you enter).
+
+Admins can set a **default** source (applies on first load) or **force** the source globally via the
+admin page — when forced, each device's Source toggle is disabled and shows "Managed by server". The
+setting persists in `localStorage` on each device and obeys the same URL param preset (`?source=local`).
+Server-fetched weather works on isolated LANs; Local mode requires the device to have internet for its
+own location.
+
 ---
 
 ## File structure
@@ -317,9 +329,9 @@ Interact once and the control band fades in; it auto-hides after ~5 seconds of n
 - **Dim** — manual near-black dim toggle.
 - **Settings** — orientation (auto/portrait/landscape), **Display** (plain/dynamic), clock
   **Style** (classic/block), **Sun arc** (on/off), **Second clock** (curated timezone, subtle
-  corner readout), 12/24h, seconds on/off, date on/off, night-dim schedule (default **off**),
-  **Location** (Server/Custom), ZIP/city search, and "Use my location" (Geolocation where available).
-  Temperatures always show **both °F and °C**.
+  corner readout), **Source** (Server/Local authority), 12/24h, seconds on/off, date on/off,
+  night-dim schedule (default **off**), **Location** (Server/Custom), ZIP/city search, and "Use my
+  location" (Geolocation where available). Temperatures always show **both °F and °C**.
 
 **Sun arc.** A small SVG in the weather card traces the sun from sunrise (left horizon) → solar
 noon (apex) → sunset (right horizon), positioned by the current time of day. Elapsed portion is a
@@ -329,12 +341,34 @@ Open-Meteo call (no extra request, cached offline). It's toggleable (`sun=on|off
 the clock. Note: sun times are in the **weather location's** timezone while the clock shows
 **device-local** time — exact when those match (the normal case), slightly off for a far-away city.
 
+**Second clock.** Pick a city / timezone under **Settings → Second**; a small corner badge shows
+its **current time** with a **day offset hint** (e.g., `+1d` or `−1d` if the day differs from your
+device's local date) and a **tiny temperature chip** (if in Dynamic mode and the device has internet
+for that city's weather). The badge digits are tinted to **that city's own weather-feel colors**,
+independent of the primary location — so you can see at a glance if it's cold or hot where your
+colleague is. The second city requires device internet to fetch weather; a clock remains readable even
+if that fetch fails.
+
 **Display: Plain vs Dynamic.** *Plain* (default) is static white text on near-black. *Dynamic* tints
 the text to the current condition and draws an animated weather backdrop driven by the WMO code —
 drifting clouds, falling rain, snow, fog haze, a warm sun glow, or thunder flashes. It's kept
 low-brightness and always moving (burn-in-safe), **pauses in night-dim**, and is **disabled on
 `prefers-reduced-motion`** and throttled on TV-class / weak devices. Purely decorative — the clock
 never depends on it.
+
+*Dynamic* mode also **tints clock digits and hands to "weather feel"** — a blend of temperature and
+humidity:
+  - **−5°C and below:** icy cyan-blue (winter)
+  - **5°C:** blue (cold)
+  - **14°C:** teal (cool)
+  - **21°C:** green (mild)
+  - **27°C:** amber (warm)
+  - **33°C and above:** orange-red (hot)
+
+Humid air desaturates the color and pulls warmer temps slightly toward muggy green. The **animated
+backdrop remains sky-condition-based** (rain, snow, clouds, sun) — color reflects the *feel* while
+backdrop reflects the *weather*. The second-clock badge (if shown) is also tinted to **its own city's
+weather**, independent of the primary location.
 
 US defaults: **°F** and **12-hour**, both switchable live.
 
