@@ -1,0 +1,35 @@
+# Caddyfile — automatic-HTTPS reverse proxy in front of the clock PWA.
+#
+# Why: plain HTTP blocks the service worker, so no offline cache and no
+# installable PWA. Terminating HTTPS here unlocks both. Caddy auto-provisions
+# and renews a Let's Encrypt certificate — no manual cert wrangling.
+#
+# Setup:
+#   1. Point your domain's DNS (A / AAAA) at this host.
+#   2. Replace clock.example.com below with that domain.
+#   3. Run Caddy (pick one):
+#        binary:  caddy run --config ./Caddyfile
+#        docker:  docker run -d --name caddy --network host \
+#                   -v "$PWD/Caddyfile":/etc/caddy/Caddyfile \
+#                   -v caddy_data:/data caddy:2
+
+clock.example.com {
+	encode zstd gzip
+	reverse_proxy localhost:8080
+}
+
+# --- Running Caddy inside the same docker-compose network ---
+# If Caddy and the clock container share a compose network, target the service
+# name + internal port instead of localhost:
+#
+# clock.example.com {
+# 	encode zstd gzip
+# 	reverse_proxy clock:80
+# }
+
+# --- Local HTTPS testing (no public domain) ---
+# Caddy issues an internally-trusted cert for https://localhost:
+#
+# localhost {
+# 	reverse_proxy localhost:8080
+# }

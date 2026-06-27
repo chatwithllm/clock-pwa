@@ -8,3 +8,13 @@ docker-compose.yml
 scratchpad
 *.log
 *.png.bak
+# Dev-only — never served by nginx (Dockerfile COPYs files explicitly), so these
+# just bloat the build context. Trim them out.
+package.json
+test
+docs
+.superpowers
+.claude
+graphify-out
+node_modules
+Caddyfile
