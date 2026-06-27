@@ -102,6 +102,21 @@
       Each display shows messages targeted to <code>All</code> or to its own <b>Profile</b>
       (set per device in the clock's Settings → Profile). Banner auto-hides after the duration.
     </div>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Time &amp; Weather Source</h2>
+      <p class="hint">Dictate where devices get time and weather. Force locks the device toggle.</p>
+      <div class="row">
+        <label><input type="radio" name="srcMode" value="server" checked> Server (host clock + server weather)</label>
+        <label><input type="radio" name="srcMode" value="local"> Local (device clock + its own location)</label>
+      </div>
+      <label class="row"><input type="checkbox" id="srcForce"> Force (lock the device toggle)</label>
+      <div class="row" style="margin-top:14px">
+        <button class="ghost" id="srcSave" type="button">Save</button>
+        <button class="ghost" id="srcClear" type="button">Clear (no server opinion)</button>
+      </div>
+      <div class="status" id="srcStatus" aria-live="polite"></div>
+    </section>
   </div>
 
   <script>
@@ -301,6 +316,44 @@
     });
 
     loadProfiles();
+
+    function setSrcStatus(msg, ok){ var s=$('srcStatus'); s.textContent=msg; s.className='status '+(ok===true?'ok':ok===false?'err':''); }
+    function srcMode(){ var r=document.querySelector('input[name=srcMode]:checked'); return r?r.value:'server'; }
+
+    function putSource(body){
+      return fetch('source.json', {
+        method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+    }
+
+    function loadSource(){
+      fetch('source.json?ts=' + Date.now(), { cache:'no-store' }).then(function(r){
+        return r.ok ? r.json() : {};
+      }).then(function(j){
+        if (j && (j.mode === 'server' || j.mode === 'local')){
+          var radio = document.querySelector('input[name=srcMode][value="'+j.mode+'"]');
+          if (radio) radio.checked = true;
+          $('srcForce').checked = !!j.force;
+        }
+      }).catch(function(){});
+    }
+
+    $('srcSave').addEventListener('click', function(){
+      var body = { mode: srcMode(), force: $('srcForce').checked };
+      setSrcStatus('Saving…');
+      putSource(body).then(function(r){
+        setSrcStatus(r.ok ? 'Saved.' : 'Failed (HTTP '+r.status+').', r.ok);
+      }).catch(function(e){ setSrcStatus('Failed: '+e, false); });
+    });
+
+    $('srcClear').addEventListener('click', function(){
+      setSrcStatus('Clearing…');
+      putSource({}).then(function(r){
+        setSrcStatus(r.ok ? 'Cleared — devices choose for themselves.' : 'Failed (HTTP '+r.status+').', r.ok);
+      }).catch(function(e){ setSrcStatus('Failed: '+e, false); });
+    });
+
+    loadSource();
   </script>
 </body>
 </html>
