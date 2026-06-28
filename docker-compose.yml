@@ -15,6 +15,10 @@ services:
       # Set ADMIN_AUTH=off to disable auth entirely.
       ADMIN_USER: "admin"
       ADMIN_PASS: "change-me"
+      # Bearer token Home Assistant sends to push critical alerts. Used here only
+      # so the admin "Active Alerts" Clear button can proxy to the sidecar with the
+      # token injected. Must match the alert-sidecar service's value below.
+      ALERT_API_TOKEN: "${ALERT_API_TOKEN:-}"
     # Announcements are sent from the admin page (http://<host>:8080/admin.html)
     # or the helper (docker exec clock-pwa /usr/local/bin/announce.sh "msg"); they
     # write the in-container /data/announce.json (no host mount needed).
@@ -22,3 +26,24 @@ services:
     #   # Alternative to the env vars above: mount + live-edit config.json instead.
     #   - ./config.json:/usr/share/nginx/html/config.json
     restart: unless-stopped
+
+  alert-sidecar:
+    build: ./alert-sidecar
+    image: clock-alert-sidecar
+    container_name: clock-alert-sidecar
+    environment:
+      # Shared secret HA sends as `Authorization: Bearer <token>`. REQUIRED to
+      # enable the API — unset/blank means the sidecar rejects all writes (503).
+      ALERT_API_TOKEN: "${ALERT_API_TOKEN:-}"
+      ALERTS_FILE: "/data/alerts.json"
+    volumes:
+      - alertdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8090/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  alertdata:
