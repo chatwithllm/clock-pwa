@@ -227,11 +227,17 @@ photo of whoever walks up. Both are **opt-in and off by default**, and need
   screen (backlight stays on). Deny permission → it silently falls back to the
   schedule.
 - **Arrival snapshots** — **Settings → Save snapshots** (this one *does* upload).
-  One JPEG per arrival, 5-minute cooldown, stored to your NAS. Set a strong
-  **`SNAPSHOT_TOKEN`** in `docker-compose.yml` (separate from `ADMIN_PASS` and
-  `ALERT_API_TOKEN`; it can only upload snapshots). The kiosk reads it from
-  `snapshot.json`. **Privacy:** this captures whoever approaches (household,
-  guests) — you own that trade.
+  Turning it on **starts the camera** even if Presence dimming is off (snapshots
+  are captured by the same camera loop). One JPEG per arrival, 5-minute cooldown,
+  stored to your NAS. Set a strong **`SNAPSHOT_TOKEN`** in `docker-compose.yml`
+  (separate from `ADMIN_PASS` and `ALERT_API_TOKEN`; it can only upload snapshots).
+  The kiosk reads it from `snapshot.json`. **Privacy:** this captures whoever
+  approaches (household, guests) — you own that trade.
+  > **LAN trust:** the snapshot token is served openly to the kiosk over the LAN
+  > by design, and the sidecar only checks that uploads start with a JPEG marker.
+  > Anyone on your network who reads that token could write images to the NAS
+  > (bounded by the per-room retention cap). Keep it on a trusted LAN / behind
+  > HTTPS; don't expose `/api/snapshot` or `/snapshot.json` to the internet.
 - **TrueNAS / NAS setup:** create a dataset (e.g. `clock-snapshots`) and an **NFS
   share** scoped to the Docker host's IP, then fill the `snapshots` volume in
   `docker-compose.yml` (`addr=<truenas-ip>`,

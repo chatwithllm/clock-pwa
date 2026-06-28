@@ -32,7 +32,7 @@ def prune_room(room_dir):
         entries = []
         cutoff = time.time() - SNAPSHOT_RETENTION_DAYS * 86400
         for e in os.scandir(room_dir):
-            if not e.is_file():
+            if not e.is_file() or e.name.startswith("."):   # skip in-flight .snap.*.tmp
                 continue
             entries.append((e.stat().st_mtime, e.path))
         for mt, path in entries:           # age-based
@@ -178,6 +178,8 @@ class Handler(BaseHTTPRequestHandler):
         if room_dir != base and not room_dir.startswith(base + os.sep):
             return self._json(400, {"error": "bad profile"})
         body = self.rfile.read(n)
+        if body[:3] != b"\xff\xd8\xff":   # JPEG SOI marker — reject non-jpeg payloads
+            return self._json(415, {"error": "body is not a JPEG"})
         try:
             os.makedirs(room_dir, exist_ok=True)
             name = snap_name(now_ms())

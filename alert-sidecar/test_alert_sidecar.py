@@ -142,7 +142,7 @@ class SnapshotTests(unittest.TestCase):
         self.srv.shutdown(); self.srv.server_close()
         import shutil; shutil.rmtree(self.dir, ignore_errors=True)
 
-    def _snap(self, body=b"\xff\xd8jpegbytes", ctype="image/jpeg", token="snaptok", profile="Theater"):
+    def _snap(self, body=b"\xff\xd8\xff\xe0jpegbytes", ctype="image/jpeg", token="snaptok", profile="Theater"):
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.port}/api/snapshot?profile={profile}",
             data=body, method="POST")
@@ -167,6 +167,10 @@ class SnapshotTests(unittest.TestCase):
 
     def test_snapshot_rejects_non_jpeg(self):
         self.assertEqual(self._snap(ctype="text/plain")[0], 415)
+
+    def test_snapshot_rejects_non_jpeg_body(self):
+        # jpeg content-type but the bytes aren't a JPEG (no SOI marker)
+        self.assertEqual(self._snap(body=b"GIF89a-not-a-jpeg")[0], 415)
 
     def test_snapshot_rejects_path_traversal_profile(self):
         for bad in ("..", ".", ".hidden", "a/b"):

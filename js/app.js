@@ -278,6 +278,12 @@ function stopPresence(){
     app.presentNow = true; applyPresence(true);
   } catch(_){}
 }
+// The camera must run if EITHER presence dimming OR snapshot capture is wanted
+// (snapshots are captured inside the presence loop). Idempotent.
+function syncPresenceRunning(){
+  if (app.settings.presence || app.settings.saveSnapshots) startPresence();
+  else stopPresence();
+}
 
 // ---------- Server-provided location (/config.json) ----------
 function loadServerLocCache(){
@@ -895,11 +901,12 @@ function wireControls(){
   });
   $('setPresence').addEventListener('click', () => {
     app.settings.presence = !app.settings.presence;
-    if (app.settings.presence) startPresence(); else stopPresence();
+    syncPresenceRunning();
     persist(); syncButtons();
   });
   $('setSnapshots').addEventListener('click', () => {
     app.settings.saveSnapshots = !app.settings.saveSnapshots;
+    syncPresenceRunning();   // turning snapshots on starts the camera even if dimming is off
     persist(); syncButtons();
   });
   $('setOrient').addEventListener('click', () => {
@@ -1156,8 +1163,8 @@ async function boot(){
     document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAlerts(); });
   } catch(_){}
 
-  // Camera presence (opt-in): start the detector if the setting is on.
-  try { if (app.settings.presence) startPresence(); } catch(_){}
+  // Camera presence (opt-in): start the detector if presence dimming OR snapshots are on.
+  try { syncPresenceRunning(); } catch(_){}
 
   setState(REST);
   registerSW();
