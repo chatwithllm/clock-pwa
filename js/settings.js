@@ -31,6 +31,8 @@ const DEFAULTS = {
   profile: 'None',      // device room profile (Theater Room / Kitchen / …) for targeting + future room behavior
   secondTz: 'off',      // secondary-clock zone id (see SECOND_ZONES in app.js)
   soundEnabled: false,  // notification chimes (requires a one-time enable gesture per device)
+  presence: false,      // front-camera motion presence -> dim when no one is near (opt-in; needs HTTPS + camera)
+  saveSnapshots: false, // upload one JPEG per arrival to the server/NAS (needs presence on)
   sourceUserSet: false, // true once the user has explicitly toggled the Source button
   lat: null,            // CUSTOM location (set via ZIP/city/geolocation/URL)
   lon: null,
@@ -76,6 +78,12 @@ function readURL(){
     const h = q.get('hour');
     if (h === '24') out.hour24 = true;
     if (h === '12') out.hour24 = false;
+    const pres = (q.get('presence') || '').toLowerCase();
+    if (pres === 'on' || pres === '1' || pres === 'true') out.presence = true;
+    if (pres === 'off' || pres === '0' || pres === 'false') out.presence = false;
+    const snaps = (q.get('snapshots') || '').toLowerCase();
+    if (snaps === 'on' || snaps === '1' || snaps === 'true') out.saveSnapshots = true;
+    if (snaps === 'off' || snaps === '0' || snaps === 'false') out.saveSnapshots = false;
     const src = (q.get('source') || '').toLowerCase();
     if (src === 'server' || src === 'local') out.source = src;
   } catch (_) {}
@@ -118,6 +126,7 @@ export function saveSettings(s){
     source: s.source,
     locationMode: s.locationMode, timeSource: s.timeSource, profile: s.profile, secondTz: s.secondTz,
     soundEnabled: s.soundEnabled,
+    presence: s.presence, saveSnapshots: s.saveSnapshots,
     sourceUserSet: s.sourceUserSet,
     lat: s.lat, lon: s.lon, city: s.city,
   };

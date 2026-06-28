@@ -187,6 +187,66 @@ correct MIME type and keeps `sw.js` uncached so updates ship.
 > the cert recipe in that section. Over plain `http://<LAN-IP>` the clock + weather work but the
 > service worker / install are blocked by the browser.
 
+### Room awareness — NFC profiles
+
+Dedicated iPhones placed around the house can auto-switch their **profile** (room)
+when you dock them, using NFC. iOS has **no Web NFC API**, so the app never touches
+NFC — iOS reads the tag and opens a URL; the app just consumes `?profile=`.
+
+- **Kiosk setup:** run the clock in full-screen **Safari** (not an installed PWA —
+  needed for the camera presence feature below), locked with **Guided Access**
+  (Settings → Accessibility → Guided Access; triple-click the side button on the
+  clock tab to lock). Set **Display Auto-Lock = Never** and enable **Mirror
+  Display Auto-Lock** (otherwise iOS forces a 20-minute timeout). Serve over
+  **HTTPS** (see *Hosting over LAN HTTPS*) — required for the camera.
+- **NFC tag:** encode an NDEF **URL record** `https://<clock-host>/?profile=<room>`
+  on a tag at each room's charger (URL-encode spaces, e.g. `Theater%20Room`). Place
+  it where the phone's top back rests when docked.
+- **Automatic switch:** create a per-phone **iOS Shortcuts Personal Automation** →
+  *Automation → NFC → scan the tag → Open URL `https://<clock-host>/?profile=<room>`*,
+  with **"Ask Before Running" off**. Docking the phone re-rooms the display with no
+  prompt. (A plain NDEF-URL tap, which shows the system banner, is the no-Shortcut
+  fallback.) The app shows a brief confirmation toast naming the room.
+
+### Presence dimming + arrival snapshots (camera)
+
+The front camera can dim the display when no one's around and (optionally) save a
+photo of whoever walks up. Both are **opt-in and off by default**, and need
+**HTTPS** + camera permission (iOS shows a permanent red "camera in use" bar).
+
+> **Why Safari, not an installed PWA:** `getUserMedia` is unreliable in iOS
+> home-screen PWAs — run the clock in Safari (Guided Access). On a MagSafe charger
+> the phone is always powered, so the camera's battery cost is moot.
+
+- **Presence dimming** — **Settings → Presence**. In-browser **motion** detection
+  (no face recognition; iOS has no FaceDetector) brightens the clock when someone
+  is near and **deep-dims** it after ~90 s of stillness; any motion re-wakes it
+  instantly. It composes with the night schedule (dim if night **or** away).
+  Frames are analyzed **on-device and never leave the phone**. Under Guided Access
+  the app can't truly power the screen off, so "away" is a near-black, burn-in-safe
+  screen (backlight stays on). Deny permission → it silently falls back to the
+  schedule.
+- **Arrival snapshots** — **Settings → Save snapshots** (this one *does* upload).
+  Turning it on **starts the camera** even if Presence dimming is off (snapshots
+  are captured by the same camera loop). One JPEG per arrival, 5-minute cooldown,
+  stored to your NAS. Set a strong **`SNAPSHOT_TOKEN`** in `docker-compose.yml`
+  (separate from `ADMIN_PASS` and `ALERT_API_TOKEN`; it can only upload snapshots).
+  The kiosk reads it from `snapshot.json`. **Privacy:** this captures whoever
+  approaches (household, guests) — you own that trade.
+  > **LAN trust:** the snapshot token is served openly to the kiosk over the LAN
+  > by design, and the sidecar only checks that uploads start with a JPEG marker.
+  > Anyone on your network who reads that token could write images to the NAS
+  > (bounded by the per-room retention cap). Keep it on a trusted LAN / behind
+  > HTTPS; don't expose `/api/snapshot` or `/snapshot.json` to the internet.
+- **TrueNAS / NAS setup:** create a dataset (e.g. `clock-snapshots`) and an **NFS
+  share** scoped to the Docker host's IP, then fill the `snapshots` volume in
+  `docker-compose.yml` (`addr=<truenas-ip>`,
+  `device=:/mnt/<pool>/<dataset>/clock-snapshots`). SMB/CIFS or a host bind-mount
+  work too. Browse images straight on the NAS — one subfolder per room. If the NAS
+  is down, uploads fail quietly and nothing else breaks. Retention defaults: keep
+  30 days / 1000 per room (`SNAPSHOT_RETENTION_DAYS`, `SNAPSHOT_MAX_PER_ROOM`),
+  1 MiB per-image cap (`SNAPSHOT_MAX_BYTES`).
+
 ### Updating a deployed container
 
 The image is built from source (no published registry image), so update = pull + rebuild on the

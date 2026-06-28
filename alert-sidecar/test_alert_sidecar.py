@@ -125,3 +125,72 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        A.SNAPSHOTS_DIR = self.dir
+        A.SNAPSHOT_TOKEN = "snaptok"
+        A.TOKEN = "secret"
+        A.SNAPSHOT_MAX_PER_ROOM = 3
+        self.srv = ThreadingHTTPServer(("127.0.0.1", 0), A.Handler)
+        self.port = self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.srv.shutdown(); self.srv.server_close()
+        import shutil; shutil.rmtree(self.dir, ignore_errors=True)
+
+    def _snap(self, body=b"\xff\xd8\xff\xe0jpegbytes", ctype="image/jpeg", token="snaptok", profile="Theater"):
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/snapshot?profile={profile}",
+            data=body, method="POST")
+        if token is not None: req.add_header("Authorization", f"Bearer {token}")
+        if ctype is not None: req.add_header("Content-Type", ctype)
+        try:
+            with urllib.request.urlopen(req) as r: return r.status, json.load(r)
+        except urllib.error.HTTPError as e:
+            with e: return e.code, json.load(e)
+
+    def test_snapshot_token_unset_fails_closed(self):
+        A.SNAPSHOT_TOKEN = ""
+        code, _ = self._snap()
+        self.assertEqual(code, 503)
+        A.SNAPSHOT_TOKEN = "snaptok"
+
+    def test_snapshot_bad_bearer(self):
+        self.assertEqual(self._snap(token="nope")[0], 401)
+
+    def test_alert_token_does_not_authorize_snapshot(self):
+        self.assertEqual(self._snap(token="secret")[0], 401)
+
+    def test_snapshot_rejects_non_jpeg(self):
+        self.assertEqual(self._snap(ctype="text/plain")[0], 415)
+
+    def test_snapshot_rejects_non_jpeg_body(self):
+        # jpeg content-type but the bytes aren't a JPEG (no SOI marker)
+        self.assertEqual(self._snap(body=b"GIF89a-not-a-jpeg")[0], 415)
+
+    def test_snapshot_rejects_path_traversal_profile(self):
+        for bad in ("..", ".", ".hidden", "a/b"):
+            self.assertEqual(self._snap(profile=bad)[0], 400, bad)
+        import glob
+        self.assertEqual(glob.glob(os.path.join(self.dir, "..", "*.jpg")), [])
+
+    def test_snapshot_happy_writes_file(self):
+        code, body = self._snap()
+        self.assertEqual(code, 200)
+        room = os.path.join(self.dir, "Theater")
+        files = os.listdir(room)
+        self.assertEqual(len(files), 1)
+        self.assertTrue(files[0].endswith(".jpg"))
+
+    def test_snapshot_retention_prunes_oldest(self):
+        import time as _t
+        for i in range(5):
+            A.now_ms = (lambda v: (lambda: v))(1000 + i)   # distinct, increasing
+            self.assertEqual(self._snap()[0], 200)
+            _t.sleep(0.01)
+        room = os.path.join(self.dir, "Theater")
+        self.assertLessEqual(len(os.listdir(room)), 3)   # MAX_PER_ROOM

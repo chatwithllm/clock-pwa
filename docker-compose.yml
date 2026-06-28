@@ -19,6 +19,10 @@ services:
       # so the admin "Active Alerts" Clear button can proxy to the sidecar with the
       # token injected. Must match the alert-sidecar service's value below.
       ALERT_API_TOKEN: "${ALERT_API_TOKEN:-}"
+      # Low-privilege snapshot-upload token. Published to the kiosk via snapshot.json;
+      # the kiosk uses it to POST one JPEG per arrival. Separate from ALERT_API_TOKEN
+      # and the admin password. Unset = snapshots disabled.
+      SNAPSHOT_TOKEN: "${SNAPSHOT_TOKEN:-}"
     # Announcements are sent from the admin page (http://<host>:8080/admin.html)
     # or the helper (docker exec clock-pwa /usr/local/bin/announce.sh "msg"); they
     # write the in-container /data/announce.json (no host mount needed).
@@ -36,8 +40,11 @@ services:
       # enable the API — unset/blank means the sidecar rejects all writes (503).
       ALERT_API_TOKEN: "${ALERT_API_TOKEN:-}"
       ALERTS_FILE: "/data/alerts.json"
+      SNAPSHOT_TOKEN: "${SNAPSHOT_TOKEN:-}"
+      SNAPSHOTS_DIR: "/data/snapshots"
     volumes:
       - alertdata:/data
+      - snapshots:/data/snapshots
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8090/api/health').status==200 else 1)"]
@@ -47,3 +54,12 @@ services:
 
 volumes:
   alertdata:
+  # Arrival snapshots, stored on the NAS. Fill in your TrueNAS NFS export:
+  #   addr=<truenas-ip>, device=:/mnt/<pool>/<dataset>/clock-snapshots
+  # (SMB/CIFS or a host bind-mount are alternatives — see the README.)
+  snapshots:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=TRUENAS_IP,nfsvers=4,rw,soft"
+      device: ":/mnt/POOL/DATASET/clock-snapshots"

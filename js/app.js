@@ -11,6 +11,7 @@ import { WakeKeeper } from './wakelock.js';
 import { WeatherFX } from './weatherfx.js';
 import { weatherColor } from './feelcolor.js';
 import { alertView } from './alertview.js';
+import { Presence } from './presence.js';
 import { SunArc } from './sunarc.js';
 
 const $ = (id) => document.getElementById(id);
@@ -80,6 +81,9 @@ const app = {
   _alertChimed: null,
   _alertChimeTimer: null,
   alertActive: false,
+  presence: null,
+  presentNow: true,
+  snapshotToken: '',
   reduceMotion: false,
   state: REST,
   idleTimer: null,
@@ -234,13 +238,51 @@ function applyDim(on){
 
 function checkNightSchedule(){
   if (app.alertActive){ if (app.deepDim) applyDim(false); return; }   // criticals keep the screen bright
-  if (!app.settings.night){ if (app.deepDim) applyDim(false); return; }
-  const h = nowDate().getHours();
-  const { nightStart, nightEnd } = app.settings;
-  let on;
-  if (nightStart <= nightEnd) on = (h >= nightStart && h < nightEnd);
-  else on = (h >= nightStart || h < nightEnd); // wraps midnight
-  if (on !== app.deepDim) applyDim(on);
+  let nightOn = false;
+  if (app.settings.night){
+    const h = nowDate().getHours();
+    const { nightStart, nightEnd } = app.settings;
+    if (nightStart <= nightEnd) nightOn = (h >= nightStart && h < nightEnd);
+    else nightOn = (h >= nightStart || h < nightEnd); // wraps midnight
+  }
+  // Presence: when enabled and no one is near, dim too. Effective dim = night OR away.
+  const away = (app.settings.presence && !app.presentNow);
+  const wantDim = nightOn || away;
+  if (wantDim !== app.deepDim) applyDim(wantDim);
+}
+
+// Presence -> brightness. Re-run the dim decision with the new presence input.
+function applyPresence(present){
+  app.presentNow = present;
+  try { checkNightSchedule(); } catch(_){}
+}
+
+function startPresence(){
+  try {
+    if (app.presence) return;
+    app.presence = new Presence($('presenceVideo'), $('presenceCanvas'), {
+      onPresence: (present) => applyPresence(present),
+      snapshot: {
+        enabled: () => !!(app.settings.saveSnapshots && app.snapshotToken),
+        token: () => app.snapshotToken,
+        profile: () => app.settings.profile || 'unknown',
+        cooldownMs: 300000,
+      },
+    });
+    app.presence.start();
+  } catch(_){}
+}
+function stopPresence(){
+  try {
+    if (app.presence){ app.presence.stop(); app.presence = null; }
+    app.presentNow = true; applyPresence(true);
+  } catch(_){}
+}
+// The camera must run if EITHER presence dimming OR snapshot capture is wanted
+// (snapshots are captured inside the presence loop). Idempotent.
+function syncPresenceRunning(){
+  if (app.settings.presence || app.settings.saveSnapshots) startPresence();
+  else stopPresence();
 }
 
 // ---------- Server-provided location (/config.json) ----------
@@ -264,6 +306,12 @@ async function loadServerConfig(){
       try { localStorage.setItem(SERVERLOC_KEY, JSON.stringify(app.serverLoc)); } catch(_){}
     }
   } catch(_) { if (t) clearTimeout(t); /* keep cached/none — clock unaffected */ }
+
+  // Low-privilege snapshot-upload token, published by the server only when enabled.
+  try {
+    const r = await fetch('snapshot.json?ts=' + Date.now(), { cache:'no-store' });
+    if (r.ok){ const j = await r.json(); app.snapshotToken = (j && j.token) || ''; }
+  } catch(_){ /* absent -> snapshots disabled */ }
 }
 
 // Resolve the location to fetch weather for, honoring the Location mode.
@@ -385,6 +433,24 @@ function paintWeatherError(){
 }
 
 // ---------- Controls / button labels ----------
+// Brief "you're now in <room>" toast — shown when the page loads with a ?profile=
+// param (an NFC dock / Shortcut just re-roomed this display). Auto-dismisses.
+let _profileToastTimer = null;
+function showProfileToast(name){
+  try {
+    const el = $('profileToast'); if (!el || !name) return;
+    el.textContent = name;
+    el.hidden = false;
+    void el.offsetWidth;            // reflow so the transition runs
+    el.classList.add('show');
+    if (_profileToastTimer) clearTimeout(_profileToastTimer);
+    _profileToastTimer = setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => { el.hidden = true; }, 350);
+    }, 4000);
+  } catch(_){}
+}
+
 function syncButtons(){
   const s = app.settings;
   $('btnMode').textContent = s.mode === 'analog' ? 'Digital' : 'Analog';
@@ -405,6 +471,8 @@ function syncButtons(){
   $('setDate').textContent = s.date ? 'On' : 'Off';
   $('setNight').textContent = s.night ? 'On' : 'Off';
   $('setSound').textContent = (app.settings && app.settings.soundEnabled) ? 'On' : 'Off';
+  $('setPresence').textContent = app.settings.presence ? 'On' : 'Off';
+  $('setSnapshots').textContent = app.settings.saveSnapshots ? 'On' : 'Off';
   syncDimButton();
 }
 function syncDimButton(){
@@ -831,6 +899,16 @@ function wireControls(){
     if (app.settings.soundEnabled){ ensureAudio(); playChime('ding'); }
     persist(); syncButtons();
   });
+  $('setPresence').addEventListener('click', () => {
+    app.settings.presence = !app.settings.presence;
+    syncPresenceRunning();
+    persist(); syncButtons();
+  });
+  $('setSnapshots').addEventListener('click', () => {
+    app.settings.saveSnapshots = !app.settings.saveSnapshots;
+    syncPresenceRunning();   // turning snapshots on starts the camera even if dimming is off
+    persist(); syncButtons();
+  });
   $('setOrient').addEventListener('click', () => {
     const order = ['auto','portrait','landscape'];
     const i = order.indexOf(app.settings.orientation);
@@ -1009,6 +1087,12 @@ async function boot(){
   wireInput();
   syncButtons();
 
+  // NFC dock / Shortcut opens the page with ?profile=<room> — confirm the switch.
+  try {
+    const urlProfile = new URLSearchParams(location.search).get('profile');
+    if (urlProfile && urlProfile.trim()) showProfileToast(urlProfile.trim());
+  } catch(_){}
+
   // Wake lock (phone only; no-op on TV) + on-screen status indicator.
   try {
     app.wake = new WakeKeeper({ isTV: app.isTV, video: $('wlVideo') });
@@ -1078,6 +1162,9 @@ async function boot(){
     app.alertTimer = setInterval(pollAlerts, ALERT_POLL_MS);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAlerts(); });
   } catch(_){}
+
+  // Camera presence (opt-in): start the detector if presence dimming OR snapshots are on.
+  try { syncPresenceRunning(); } catch(_){}
 
   setState(REST);
   registerSW();

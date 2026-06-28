@@ -27,9 +27,10 @@ COPY icons /usr/share/nginx/html/icons
 # Startup scripts: admin basic-auth, config.json from env, server weather fetcher.
 COPY docker-entrypoint.d/10-admin-auth.sh    /docker-entrypoint.d/10-admin-auth.sh
 COPY docker-entrypoint.d/20-alert-token.sh   /docker-entrypoint.d/20-alert-token.sh
+COPY docker-entrypoint.d/25-snapshot-config.sh /docker-entrypoint.d/25-snapshot-config.sh
 COPY docker-entrypoint.d/30-clock-config.sh  /docker-entrypoint.d/30-clock-config.sh
 COPY docker-entrypoint.d/40-weather-fetch.sh /docker-entrypoint.d/40-weather-fetch.sh
-RUN chmod +x /docker-entrypoint.d/10-admin-auth.sh /docker-entrypoint.d/20-alert-token.sh /docker-entrypoint.d/30-clock-config.sh /docker-entrypoint.d/40-weather-fetch.sh
+RUN chmod +x /docker-entrypoint.d/10-admin-auth.sh /docker-entrypoint.d/20-alert-token.sh /docker-entrypoint.d/25-snapshot-config.sh /docker-entrypoint.d/30-clock-config.sh /docker-entrypoint.d/40-weather-fetch.sh && printf '{}\n' > /usr/share/nginx/html/snapshot.json
 # Ensure the auth + alert-clear includes exist even before the entrypoint runs (nginx -t safety).
 RUN : > /etc/nginx/admin_auth.conf && printf 'return 503;\n' > /etc/nginx/alert_clear.conf
 

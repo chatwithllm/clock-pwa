@@ -13,6 +13,40 @@ MAX_ACTIVE = int(os.environ.get("ALERT_MAX_ACTIVE", "20"))
 KEY_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _lock = threading.Lock()
 
+SNAPSHOT_TOKEN = os.environ.get("SNAPSHOT_TOKEN", "").strip()
+SNAPSHOTS_DIR = os.environ.get("SNAPSHOTS_DIR", "/data/snapshots")
+SNAPSHOT_MAX_BYTES = int(os.environ.get("SNAPSHOT_MAX_BYTES", str(1024 * 1024)))
+SNAPSHOT_RETENTION_DAYS = int(os.environ.get("SNAPSHOT_RETENTION_DAYS", "30"))
+SNAPSHOT_MAX_PER_ROOM = int(os.environ.get("SNAPSHOT_MAX_PER_ROOM", "1000"))
+# No '.' at all (blocks '.', '..', dotfiles) and must start with an alnum/underscore.
+PROFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9 _\-]{0,63}$")
+
+
+def snap_name(ms):
+    t = time.gmtime(ms / 1000)
+    return time.strftime("%Y%m%d-%H%M%S", t) + "-%03d.jpg" % (ms % 1000)
+
+
+def prune_room(room_dir):
+    try:
+        entries = []
+        cutoff = time.time() - SNAPSHOT_RETENTION_DAYS * 86400
+        for e in os.scandir(room_dir):
+            if not e.is_file() or e.name.startswith("."):   # skip in-flight .snap.*.tmp
+                continue
+            entries.append((e.stat().st_mtime, e.path))
+        for mt, path in entries:           # age-based
+            if mt < cutoff:
+                try: os.unlink(path)
+                except OSError: pass
+        remaining = [p for mt, p in sorted(entries) if os.path.exists(p)]
+        excess = len(remaining) - SNAPSHOT_MAX_PER_ROOM   # count-based (newest kept)
+        for path in remaining[:max(0, excess)]:
+            try: os.unlink(path)
+            except OSError: pass
+    except OSError:
+        pass
+
 
 def now_ms():
     return int(time.time() * 1000)
@@ -113,6 +147,51 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _guard_snapshot(self):
+        if not SNAPSHOT_TOKEN:
+            self._json(503, {"error": "SNAPSHOT_TOKEN not set"})
+            return False
+        if not hmac.compare_digest(self.headers.get("Authorization", ""), f"Bearer {SNAPSHOT_TOKEN}"):
+            self._json(401, {"error": "unauthorized"})
+            return False
+        return True
+
+    def _handle_snapshot(self):
+        if not self._guard_snapshot():
+            return
+        if self.headers.get("Content-Type", "").split(";")[0].strip() != "image/jpeg":
+            return self._json(415, {"error": "Content-Type must be image/jpeg"})
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            n = 0
+        if n <= 0:
+            return self._json(400, {"error": "empty body"})
+        if n > SNAPSHOT_MAX_BYTES:
+            return self._json(413, {"error": "snapshot too large"})
+        profile = (parse_qs(urlparse(self.path).query).get("profile") or ["unknown"])[0]
+        if not PROFILE_RE.match(profile):
+            return self._json(400, {"error": "bad profile"})
+        # Defense in depth: ensure the resolved path stays inside SNAPSHOTS_DIR.
+        base = os.path.realpath(SNAPSHOTS_DIR)
+        room_dir = os.path.realpath(os.path.join(SNAPSHOTS_DIR, profile))
+        if room_dir != base and not room_dir.startswith(base + os.sep):
+            return self._json(400, {"error": "bad profile"})
+        body = self.rfile.read(n)
+        if body[:3] != b"\xff\xd8\xff":   # JPEG SOI marker — reject non-jpeg payloads
+            return self._json(415, {"error": "body is not a JPEG"})
+        try:
+            os.makedirs(room_dir, exist_ok=True)
+            name = snap_name(now_ms())
+            fd, tmp = tempfile.mkstemp(dir=room_dir, prefix=".snap.", suffix=".tmp")
+            with os.fdopen(fd, "wb") as f:
+                f.write(body)
+            os.replace(tmp, os.path.join(room_dir, name))
+            prune_room(room_dir)
+            return self._json(200, {"ok": True, "stored": os.path.join(profile, name)})
+        except OSError as e:
+            return self._json(500, {"error": "store failed: %s" % e})
+
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length", "0"))
@@ -133,6 +212,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "not found"})
 
     def do_POST(self):
+        if urlparse(self.path).path == "/api/snapshot":
+            return self._handle_snapshot()
         if not self._guard():
             return
         path = urlparse(self.path).path
