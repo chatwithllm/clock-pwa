@@ -2,3 +2,7 @@
 .playwright-mcp/
 *.log
 scratchpad/
+
+# Python sidecar bytecode
+__pycache__/
+*.pyc
