@@ -187,6 +187,27 @@ correct MIME type and keeps `sw.js` uncached so updates ship.
 > the cert recipe in that section. Over plain `http://<LAN-IP>` the clock + weather work but the
 > service worker / install are blocked by the browser.
 
+### Room awareness — NFC profiles
+
+Dedicated iPhones placed around the house can auto-switch their **profile** (room)
+when you dock them, using NFC. iOS has **no Web NFC API**, so the app never touches
+NFC — iOS reads the tag and opens a URL; the app just consumes `?profile=`.
+
+- **Kiosk setup:** run the clock in full-screen **Safari** (not an installed PWA —
+  needed for the camera presence feature below), locked with **Guided Access**
+  (Settings → Accessibility → Guided Access; triple-click the side button on the
+  clock tab to lock). Set **Display Auto-Lock = Never** and enable **Mirror
+  Display Auto-Lock** (otherwise iOS forces a 20-minute timeout). Serve over
+  **HTTPS** (see *Hosting over LAN HTTPS*) — required for the camera.
+- **NFC tag:** encode an NDEF **URL record** `https://<clock-host>/?profile=<room>`
+  on a tag at each room's charger (URL-encode spaces, e.g. `Theater%20Room`). Place
+  it where the phone's top back rests when docked.
+- **Automatic switch:** create a per-phone **iOS Shortcuts Personal Automation** →
+  *Automation → NFC → scan the tag → Open URL `https://<clock-host>/?profile=<room>`*,
+  with **"Ask Before Running" off**. Docking the phone re-rooms the display with no
+  prompt. (A plain NDEF-URL tap, which shows the system banner, is the no-Shortcut
+  fallback.) The app shows a brief confirmation toast naming the room.
+
 ### Updating a deployed container
 
 The image is built from source (no published registry image), so update = pull + rebuild on the

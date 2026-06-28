@@ -385,6 +385,24 @@ function paintWeatherError(){
 }
 
 // ---------- Controls / button labels ----------
+// Brief "you're now in <room>" toast — shown when the page loads with a ?profile=
+// param (an NFC dock / Shortcut just re-roomed this display). Auto-dismisses.
+let _profileToastTimer = null;
+function showProfileToast(name){
+  try {
+    const el = $('profileToast'); if (!el || !name) return;
+    el.textContent = name;
+    el.hidden = false;
+    void el.offsetWidth;            // reflow so the transition runs
+    el.classList.add('show');
+    if (_profileToastTimer) clearTimeout(_profileToastTimer);
+    _profileToastTimer = setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => { el.hidden = true; }, 350);
+    }, 4000);
+  } catch(_){}
+}
+
 function syncButtons(){
   const s = app.settings;
   $('btnMode').textContent = s.mode === 'analog' ? 'Digital' : 'Analog';
@@ -1008,6 +1026,12 @@ async function boot(){
   wireControls();
   wireInput();
   syncButtons();
+
+  // NFC dock / Shortcut opens the page with ?profile=<room> — confirm the switch.
+  try {
+    const urlProfile = new URLSearchParams(location.search).get('profile');
+    if (urlProfile && urlProfile.trim()) showProfileToast(urlProfile.trim());
+  } catch(_){}
 
   // Wake lock (phone only; no-op on TV) + on-screen status indicator.
   try {
