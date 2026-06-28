@@ -300,6 +300,12 @@ async function loadServerConfig(){
       try { localStorage.setItem(SERVERLOC_KEY, JSON.stringify(app.serverLoc)); } catch(_){}
     }
   } catch(_) { if (t) clearTimeout(t); /* keep cached/none — clock unaffected */ }
+
+  // Low-privilege snapshot-upload token, published by the server only when enabled.
+  try {
+    const r = await fetch('snapshot.json?ts=' + Date.now(), { cache:'no-store' });
+    if (r.ok){ const j = await r.json(); app.snapshotToken = (j && j.token) || ''; }
+  } catch(_){ /* absent -> snapshots disabled */ }
 }
 
 // Resolve the location to fetch weather for, honoring the Location mode.
