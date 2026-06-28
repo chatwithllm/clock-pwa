@@ -18,7 +18,8 @@ SNAPSHOTS_DIR = os.environ.get("SNAPSHOTS_DIR", "/data/snapshots")
 SNAPSHOT_MAX_BYTES = int(os.environ.get("SNAPSHOT_MAX_BYTES", str(1024 * 1024)))
 SNAPSHOT_RETENTION_DAYS = int(os.environ.get("SNAPSHOT_RETENTION_DAYS", "30"))
 SNAPSHOT_MAX_PER_ROOM = int(os.environ.get("SNAPSHOT_MAX_PER_ROOM", "1000"))
-PROFILE_RE = re.compile(r"^[A-Za-z0-9 _.\-]{1,64}$")
+# No '.' at all (blocks '.', '..', dotfiles) and must start with an alnum/underscore.
+PROFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9 _\-]{0,63}$")
 
 
 def snap_name(ms):
@@ -171,8 +172,12 @@ class Handler(BaseHTTPRequestHandler):
         profile = (parse_qs(urlparse(self.path).query).get("profile") or ["unknown"])[0]
         if not PROFILE_RE.match(profile):
             return self._json(400, {"error": "bad profile"})
+        # Defense in depth: ensure the resolved path stays inside SNAPSHOTS_DIR.
+        base = os.path.realpath(SNAPSHOTS_DIR)
+        room_dir = os.path.realpath(os.path.join(SNAPSHOTS_DIR, profile))
+        if room_dir != base and not room_dir.startswith(base + os.sep):
+            return self._json(400, {"error": "bad profile"})
         body = self.rfile.read(n)
-        room_dir = os.path.join(SNAPSHOTS_DIR, profile)
         try:
             os.makedirs(room_dir, exist_ok=True)
             name = snap_name(now_ms())

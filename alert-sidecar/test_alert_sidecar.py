@@ -168,6 +168,12 @@ class SnapshotTests(unittest.TestCase):
     def test_snapshot_rejects_non_jpeg(self):
         self.assertEqual(self._snap(ctype="text/plain")[0], 415)
 
+    def test_snapshot_rejects_path_traversal_profile(self):
+        for bad in ("..", ".", ".hidden", "a/b"):
+            self.assertEqual(self._snap(profile=bad)[0], 400, bad)
+        import glob
+        self.assertEqual(glob.glob(os.path.join(self.dir, "..", "*.jpg")), [])
+
     def test_snapshot_happy_writes_file(self):
         code, body = self._snap()
         self.assertEqual(code, 200)
