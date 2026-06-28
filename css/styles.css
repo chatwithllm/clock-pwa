@@ -421,3 +421,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 }
 .profile-toast.show{ opacity:1; }
 .profile-toast[hidden]{ display:none; }
+
+/* Off-screen capture surface for camera presence — kept out of layout/view. */
+.presence-cam{ position:fixed; width:1px; height:1px; opacity:0; pointer-events:none; left:-9999px; }

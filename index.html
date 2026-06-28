@@ -81,6 +81,10 @@
 
     <!-- Brief confirmation when a dock/NFC tap re-roomed this display. -->
     <div class="profile-toast" id="profileToast" hidden role="status"></div>
+
+    <!-- Off-screen capture surface for camera presence (hidden; never shown). -->
+    <video class="presence-cam" id="presenceVideo" playsinline muted hidden></video>
+    <canvas class="presence-cam" id="presenceCanvas" hidden></canvas>
   </main>
 
   <!-- OVERLAYS: settings panel (display:none when closed → zero layout space) -->
@@ -131,6 +135,14 @@
       <div class="row">
         <span class="row-label">Sound</span>
         <button class="ctrl" id="setSound" type="button" data-nav>Off</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Presence</span>
+        <button class="ctrl" id="setPresence" type="button" data-nav>Off</button>
+      </div>
+      <div class="row">
+        <span class="row-label">Save snapshots</span>
+        <button class="ctrl" id="setSnapshots" type="button" data-nav>Off</button>
       </div>
 
       <div class="row">
