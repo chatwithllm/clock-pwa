@@ -3,7 +3,13 @@
 # proxy the admin clear action to the sidecar with the bearer token injected
 # (so the admin page never handles the raw token). Otherwise disable it (503).
 CONF=/etc/nginx/alert_clear.conf
-if [ -n "$ALERT_API_TOKEN" ]; then
+if [ "$ADMIN_AUTH" = "off" ]; then
+  # Admin auth disabled -> do NOT expose a token-injecting clear proxy to
+  # unauthenticated callers. Disable the admin clear backstop (HA still clears
+  # via the bearer API).
+  printf 'return 503;\n' > "$CONF"
+  echo "clock: ADMIN_AUTH=off — admin alert-clear disabled (use the bearer API)"
+elif [ -n "$ALERT_API_TOKEN" ]; then
   cat > "$CONF" <<EOF
 proxy_set_header Authorization "Bearer $ALERT_API_TOKEN";
 proxy_set_header Content-Type application/json;

@@ -603,7 +603,7 @@ function playChime(name){
     if (name === 'ding'){ chimeTone(ctx, 880, 0, 0.15); }
     else if (name === 'alert'){ chimeTone(ctx, 660, 0, 0.12); chimeTone(ctx, 660, 0.2, 0.12); }
     else if (name === 'chime'){ chimeTone(ctx, 523, 0, 0.12); chimeTone(ctx, 659, 0.12, 0.12); chimeTone(ctx, 784, 0.24, 0.14); }
-    else if (name === 'alert'){ chimeTone(ctx, 988, 0, 0.16); chimeTone(ctx, 740, 0.18, 0.16); chimeTone(ctx, 988, 0.36, 0.2); }
+    else if (name === 'critical'){ chimeTone(ctx, 988, 0, 0.16); chimeTone(ctx, 740, 0.18, 0.16); chimeTone(ctx, 988, 0.36, 0.2); }
   } catch(_){}
 }
 
@@ -677,8 +677,8 @@ function renderAlerts(){
 
     if (nowActive){
       if (!app._alertChimeTimer){
-        playChime('alert');
-        app._alertChimeTimer = setInterval(() => { if (app.alertActive) playChime('alert'); }, ALERT_RECHIME_MS);
+        playChime('critical');
+        app._alertChimeTimer = setInterval(() => { if (app.alertActive) playChime('critical'); }, ALERT_RECHIME_MS);
       }
     } else if (app._alertChimeTimer){
       clearInterval(app._alertChimeTimer); app._alertChimeTimer = null;

@@ -110,6 +110,18 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(code, 503)
         A.TOKEN = "secret"
 
+    def test_cap_exceeded_over_http(self):
+        A.MAX_ACTIVE = 2
+        try:
+            for i in range(2):
+                code, _ = self._post("/api/alert", {"key": f"k{i}", "title": "t", "message": "m"})
+                self.assertEqual(code, 200)
+            code, body = self._post("/api/alert", {"key": "k2", "title": "t", "message": "m"})
+            self.assertEqual(code, 409)
+            self.assertIn("error", body)
+        finally:
+            A.MAX_ACTIVE = 20
+
 
 if __name__ == "__main__":
     unittest.main()

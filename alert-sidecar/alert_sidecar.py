@@ -2,7 +2,7 @@
 # alert_sidecar.py — bearer-authenticated push API for critical alerts.
 # Zero third-party deps. Owns the alert set: validates, persists atomically
 # (temp + os.replace under a lock), and serves the current list as JSON.
-import json, os, re, tempfile, threading, time
+import hmac, json, os, re, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -101,7 +101,7 @@ class Handler(BaseHTTPRequestHandler):
         # None -> token unset (fail closed); True/False -> bearer match.
         if not TOKEN:
             return None
-        return self.headers.get("Authorization", "") == f"Bearer {TOKEN}"
+        return hmac.compare_digest(self.headers.get("Authorization", ""), f"Bearer {TOKEN}")
 
     def _guard(self):
         a = self._auth()
