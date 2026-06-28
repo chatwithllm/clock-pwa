@@ -1,8 +1,8 @@
 // sw.js — cache-first app shell; network-first w/ cache fallback for Open-Meteo.
 // Registers only over HTTPS/localhost (browsers block SW on plain-http LAN IPs).
 
-const SHELL = 'clockpwa-shell-v16';
-const RUNTIME = 'clockpwa-runtime-v16';
+const SHELL = 'clockpwa-shell-v17';
+const RUNTIME = 'clockpwa-runtime-v17';
 
 const SHELL_FILES = [
   './',
@@ -19,6 +19,7 @@ const SHELL_FILES = [
   './js/sunarc.js',
   './js/feelcolor.js',
   './js/source.js',
+  './js/alertview.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
@@ -47,7 +48,7 @@ self.addEventListener('fetch', (e) => {
   // Server config / weather / announcements / profiles / source / ZIP geocoder: network-first, cache fallback.
   if (url.pathname === '/config.json' || url.pathname === '/weather.json'
       || url.pathname === '/announce.json' || url.pathname === '/profiles.json'
-      || url.pathname === '/source.json'
+      || url.pathname === '/source.json' || url.pathname === '/alerts.json'
       || url.hostname.endsWith('zippopotam.us')){
     e.respondWith(
       fetch(req).then((res) => {

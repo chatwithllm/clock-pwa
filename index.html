@@ -66,6 +66,18 @@
       </span>
       <span class="sc-temp" id="secondTemp" hidden></span>
     </div>
+
+    <!-- Critical-alert overlay (red, blocks the screen). Hidden unless a critical is active. -->
+    <div class="alert-overlay" id="alertOverlay" hidden role="alertdialog" aria-label="Critical alert">
+      <div class="alert-card">
+        <div class="alert-title" id="alertTitle"></div>
+        <div class="alert-message" id="alertMessage"></div>
+        <div class="alert-time" id="alertTime"></div>
+        <div class="alert-more" id="alertMore"></div>
+      </div>
+    </div>
+    <!-- Warning banner (amber strip, non-blocking). -->
+    <div class="alert-banner" id="alertBanner" hidden role="status"></div>
   </main>
 
   <!-- OVERLAYS: settings panel (display:none when closed → zero layout space) -->
