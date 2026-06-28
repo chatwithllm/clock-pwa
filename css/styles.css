@@ -386,3 +386,26 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 
 .row-note{ font-size: 12px; opacity: .6; font-style: italic; }
 .ctrl:disabled{ opacity: .5; cursor: not-allowed; }
+
+/* Critical alert overlay — red, blocks the screen, sits above announcements. */
+.alert-overlay{
+  position:fixed; inset:0; z-index:40;
+  display:grid; place-items:center; padding:6vmin;
+  background:rgba(90,0,0,.82); backdrop-filter:blur(2px);
+  animation:alertPulse 1.6s ease-in-out infinite;
+}
+.alert-overlay[hidden]{ display:none; }
+@keyframes alertPulse{ 0%,100%{background:rgba(90,0,0,.82)} 50%{background:rgba(140,0,0,.9)} }
+.alert-card{ text-align:center; max-width:90vw; color:#fff; }
+.alert-card .alert-title{ font-size:clamp(28px,7vmin,72px); font-weight:800; letter-spacing:.02em; }
+.alert-card .alert-message{ font-size:clamp(16px,3.4vmin,34px); margin-top:.4em; opacity:.95; }
+.alert-card .alert-time{ font-size:clamp(11px,1.8vmin,16px); margin-top:.8em; opacity:.7; letter-spacing:.1em; text-transform:uppercase; }
+.alert-card .alert-more{ font-size:clamp(12px,2vmin,18px); margin-top:.8em; opacity:.85; }
+/* Warning banner — amber top strip, non-blocking. */
+.alert-banner{
+  position:fixed; top:0; left:0; right:0; z-index:38;
+  padding:10px 16px; text-align:center;
+  background:rgba(180,120,0,.92); color:#fff; font-weight:600;
+  font-size:clamp(13px,2.2vmin,18px);
+}
+.alert-banner[hidden]{ display:none; }

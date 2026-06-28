@@ -93,6 +93,66 @@ synthesized in-browser, so no audio files are needed. Because browsers require a
 playing audio, each display must enable sound once via **Settings → Sound**; that preference is saved
 in `localStorage` and persists across reloads.
 
+### Critical alerts (Home Assistant)
+
+A **bearer-authenticated push API** lets [Home Assistant](https://www.home-assistant.io/)
+(or anything that can POST JSON) fire **real-time critical alerts** — water leak,
+door open, security — onto every display. This is a **separate, urgent channel**
+from announcements:
+
+- **`critical`** → a full-screen **red overlay** that overrides night-dim, re-asserts
+  the wake-lock, and repeats an urgent chime every 30s until cleared.
+- **`warning`** → a non-blocking **amber banner** at the top, chimed once.
+
+**Home Assistant owns each alert's lifecycle** via a stable `key`: it raises the
+alert when a sensor trips and clears it when the sensor resets. Devices poll
+`GET /alerts.json` every 5s; a missing/unreachable sidecar simply shows no alert —
+the clock is never affected.
+
+**Setup.** Set a shared token and rebuild:
+
+```bash
+# in docker-compose.yml (or a .env file) set a strong secret:
+#   ALERT_API_TOKEN: "your-long-random-token"
+ALERT_API_TOKEN=your-long-random-token docker compose up -d --build
+```
+
+A tiny zero-dependency **`alert-sidecar`** container owns the alert set; nginx
+proxies the API and `/alerts.json` to it. **Use HTTPS** (see the `Caddyfile` in
+this repo) so the bearer token isn't sent in clear text over the network.
+
+**API** (all writes require `Authorization: Bearer <ALERT_API_TOKEN>`):
+
+| Method & path | Body | Effect |
+| --- | --- | --- |
+| `POST /api/alert` | `{key, severity?, title, message, target?}` | Raise/refresh by `key` (`severity` `warning`\|`critical`, default `critical`; `target` a room profile or `all`) |
+| `POST /api/alert/clear` | `{key}` | Clear that alert |
+| `DELETE /api/alert?key=…` | — | Clear that alert |
+| `GET /alerts.json` | — | Current active alerts (open, what devices read) |
+
+**Home Assistant config** (`configuration.yaml`):
+
+```yaml
+rest_command:
+  clock_alert:
+    url: "https://clock.example.com/api/alert"
+    method: POST
+    headers: { Authorization: "Bearer !secret clock_alert_token" }
+    content_type: "application/json"
+    payload: '{"key":"{{ key }}","severity":"{{ severity }}","title":"{{ title }}","message":"{{ message }}"}'
+  clock_alert_clear:
+    url: "https://clock.example.com/api/alert/clear"
+    method: POST
+    headers: { Authorization: "Bearer !secret clock_alert_token" }
+    content_type: "application/json"
+    payload: '{"key":"{{ key }}"}'
+```
+
+Example automation: leak sensor `on` → `clock_alert` with `severity: critical`;
+`off` → `clock_alert_clear`. Use `warning` for low-stakes events, `critical` for
+safety. If HA ever fails to clear a stuck alert, the **admin page → Active Alerts**
+card can clear it by hand.
+
 ### Custom profiles
 
 Built-in room profiles (Theater Room, Kitchen, …) cover most setups. To add

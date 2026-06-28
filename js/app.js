@@ -10,6 +10,7 @@ import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX } from './weatherfx.js';
 import { weatherColor } from './feelcolor.js';
+import { alertView } from './alertview.js';
 import { SunArc } from './sunarc.js';
 
 const $ = (id) => document.getElementById(id);
@@ -75,6 +76,10 @@ const app = {
   _soundedIds: null,
   _sourceUserSet: false,
   _sourceLocked: false,
+  _alerts: [],
+  _alertChimed: null,
+  _alertChimeTimer: null,
+  alertActive: false,
   reduceMotion: false,
   state: REST,
   idleTimer: null,
@@ -228,6 +233,7 @@ function applyDim(on){
 }
 
 function checkNightSchedule(){
+  if (app.alertActive){ if (app.deepDim) applyDim(false); return; }   // criticals keep the screen bright
   if (!app.settings.night){ if (app.deepDim) applyDim(false); return; }
   const h = nowDate().getHours();
   const { nightStart, nightEnd } = app.settings;
@@ -597,11 +603,87 @@ function playChime(name){
     if (name === 'ding'){ chimeTone(ctx, 880, 0, 0.15); }
     else if (name === 'alert'){ chimeTone(ctx, 660, 0, 0.12); chimeTone(ctx, 660, 0.2, 0.12); }
     else if (name === 'chime'){ chimeTone(ctx, 523, 0, 0.12); chimeTone(ctx, 659, 0.12, 0.12); chimeTone(ctx, 784, 0.24, 0.14); }
+    else if (name === 'critical'){ chimeTone(ctx, 988, 0, 0.16); chimeTone(ctx, 740, 0.18, 0.16); chimeTone(ctx, 988, 0.36, 0.2); }
   } catch(_){}
 }
 
 function announceSub(a){
   return a.from || (a.target && String(a.target).toLowerCase() !== 'all' ? a.target : '');
+}
+
+// ---- Critical / warning alerts (Home Assistant push channel) ----
+const ALERT_POLL_MS = 5000;
+const ALERT_RECHIME_MS = 30000;
+
+async function pollAlerts(){
+  if (typeof fetch !== 'function') return;
+  try {
+    const r = await fetch('alerts.json?ts=' + Date.now(), { cache:'no-store' });
+    app._alerts = r.ok ? (await r.json()) : [];
+    if (!Array.isArray(app._alerts)) app._alerts = [];
+  } catch(_) { /* sidecar down / offline — keep last; clock unaffected */ }
+  renderAlerts();
+}
+
+function fmtAlertTime(ts){
+  try { return 'Raised ' + new Date(Number(ts)).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); }
+  catch(_){ return ''; }
+}
+
+function renderAlerts(){
+  try {
+    const view = alertView(app._alerts, app.settings && app.settings.profile);
+    const criticals = view.filter(a => a.severity === 'critical');
+    const warnings = view.filter(a => a.severity !== 'critical');
+    const overlay = $('alertOverlay'), banner = $('alertBanner');
+
+    if (overlay){
+      if (criticals.length){
+        const c = criticals[0];
+        $('alertTitle').textContent = c.title || 'Alert';
+        $('alertMessage').textContent = c.message || '';
+        $('alertTime').textContent = fmtAlertTime(c.ts);
+        $('alertMore').textContent = criticals.length > 1 ? ('+' + (criticals.length - 1) + ' more critical') : '';
+        overlay.hidden = false;
+      } else overlay.hidden = true;
+    }
+    if (banner){
+      if (warnings.length){
+        const w = warnings[0];
+        banner.textContent = (w.title ? w.title + ' — ' : '') + (w.message || '')
+          + (warnings.length > 1 ? ('  (+' + (warnings.length - 1) + ')') : '');
+        banner.hidden = false;
+      } else banner.hidden = true;
+    }
+
+    const nowActive = criticals.length > 0;
+    // Critical overrides night-dim + re-asserts wake while active.
+    if (nowActive && !app.alertActive){
+      app.alertActive = true;
+      if (app.deepDim) applyDim(false);
+      try { if (app.wake) app.wake.enable(); } catch(_){}
+    } else if (!nowActive && app.alertActive){
+      app.alertActive = false;
+      try { checkNightSchedule(); } catch(_){}   // restore dim if scheduled
+    }
+
+    // Chimes: warning chimes once per key; criticals re-chime on an interval.
+    if (!app._alertChimed) app._alertChimed = new Set();
+    for (const w of warnings){
+      if (!app._alertChimed.has(w.key)){ app._alertChimed.add(w.key); playChime('alert'); }
+    }
+    const liveKeys = new Set(view.map(a => a.key));
+    for (const k of Array.from(app._alertChimed)){ if (!liveKeys.has(k)) app._alertChimed.delete(k); }
+
+    if (nowActive){
+      if (!app._alertChimeTimer){
+        playChime('critical');
+        app._alertChimeTimer = setInterval(() => { if (app.alertActive) playChime('critical'); }, ALERT_RECHIME_MS);
+      }
+    } else if (app._alertChimeTimer){
+      clearInterval(app._alertChimeTimer); app._alertChimeTimer = null;
+    }
+  } catch(_) { /* never break the clock */ }
 }
 
 // Apply a computed view to the DOM. Idempotent.
@@ -987,6 +1069,14 @@ async function boot(){
     pollAnnounce(); pollProfiles(); pollSource();
     app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); pollSource(); }, ANNOUNCE_POLL_MS);
     document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); pollSource(); } });
+  } catch(_){}
+
+  // Critical alerts (Home Assistant push channel): poll every 5s + on refocus.
+  app._alertChimed = new Set();
+  try {
+    pollAlerts();
+    app.alertTimer = setInterval(pollAlerts, ALERT_POLL_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAlerts(); });
   } catch(_){}
 
   setState(REST);

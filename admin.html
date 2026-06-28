@@ -117,6 +117,13 @@
       </div>
       <div class="status" id="srcStatus" aria-live="polite"></div>
     </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Active Alerts</h2>
+      <p class="hint">Live critical/warning alerts pushed by Home Assistant. Clear one if it's stuck (HA normally clears its own).</p>
+      <div id="alertList"></div>
+      <div class="status" id="alertStatus" aria-live="polite"></div>
+    </section>
   </div>
 
   <script>
@@ -354,6 +361,42 @@
     });
 
     loadSource();
+
+    // ---- Active Alerts (Home Assistant push channel) ----
+    function setAlertStatus(msg, ok){ var s=$('alertStatus'); s.textContent=msg; s.className='status '+(ok===true?'ok':ok===false?'err':''); }
+
+    function loadAlerts(){
+      fetch('alerts.json?ts=' + Date.now(), { cache:'no-store' }).then(function(r){
+        return r.ok ? r.json() : [];
+      }).then(function(list){
+        if (!Array.isArray(list) || !list.length){
+          $('alertList').innerHTML = '<span class="hint" style="margin:0">No active alerts.</span>';
+          return;
+        }
+        $('alertList').innerHTML = list.map(function(a){
+          var sev = a.severity === 'warning' ? 'warning' : 'critical';
+          return '<div class="row"><span>['+sev+'] <strong>'+esc(a.title||'')+'</strong> — '+esc(a.message||'')
+               + ' <em>('+esc(a.key)+')</em></span>'
+               + '<button class="ctrl" type="button" data-key="'+esc(a.key)+'">Clear</button></div>';
+        }).join('');
+      }).catch(function(){ $('alertList').innerHTML = '<span class="hint" style="margin:0">Could not load alerts.</span>'; });
+    }
+
+    $('alertList').addEventListener('click', function(e){
+      var btn = e.target.closest ? e.target.closest('button[data-key]') : null;
+      if (!btn) return;
+      var key = btn.getAttribute('data-key');
+      setAlertStatus('Clearing…');
+      fetch('admin/alert-clear', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: key })
+      }).then(function(r){
+        setAlertStatus(r.ok ? 'Cleared "'+key+'".' : 'Failed (HTTP '+r.status+').', r.ok);
+        loadAlerts();
+      }).catch(function(e){ setAlertStatus('Failed: '+e, false); });
+    });
+
+    loadAlerts();
+    setInterval(loadAlerts, 5000);
   </script>
 </body>
 </html>
