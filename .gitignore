@@ -6,3 +6,6 @@ scratchpad/
 # Python sidecar bytecode
 __pycache__/
 *.pyc
+
+# graphify knowledge-graph output (local artifact)
+graphify-out/
