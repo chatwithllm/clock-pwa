@@ -260,3 +260,24 @@ class PresenceTests(unittest.TestCase):
         self.assertEqual(self._post({"room": "Kitchen"})[0], 400)          # missing present
         self.assertEqual(self._post({"present": True})[0], 400)            # missing room
         self.assertEqual(self._post({"room": "x/y", "present": True})[0], 400)  # bad room
+
+    def test_relay_does_not_follow_redirects(self):
+        import http.server, socketserver
+        hits = []
+        class Redir(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+            def do_POST(self):
+                hits.append(self.path)
+                self.send_response(302)
+                self.send_header("Location", "http://127.0.0.1:1/evil")
+                self.send_header("Content-Length", "0"); self.end_headers()
+        rsrv = ThreadingHTTPServer(("127.0.0.1", 0), Redir)
+        threading.Thread(target=rsrv.serve_forever, daemon=True).start()
+        try:
+            A.HA_WEBHOOK_URL = f"http://127.0.0.1:{rsrv.server_address[1]}/hook"
+            code, body = self._post({"room": "Kitchen", "present": True})
+            self.assertEqual(code, 200)
+            self.assertFalse(body["relayed"])      # 302 not followed -> treated as failure
+            self.assertEqual(len(hits), 1)         # only the original POST, no redirect chase
+        finally:
+            rsrv.shutdown(); rsrv.server_close()

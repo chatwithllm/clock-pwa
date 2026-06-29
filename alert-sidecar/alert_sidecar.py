@@ -7,6 +7,12 @@ import urllib.request, urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None   # never follow redirects on the relay (SSRF hardening)
+
+_RELAY_OPENER = urllib.request.build_opener(_NoRedirect)
+
 TOKEN = os.environ.get("ALERT_API_TOKEN", "").strip()
 ALERTS_FILE = os.environ.get("ALERTS_FILE", "/data/alerts.json")
 PORT = int(os.environ.get("ALERT_PORT", "8090"))
@@ -224,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
             data = json.dumps({"room": room, "present": present}).encode()
             req = urllib.request.Request(HA_WEBHOOK_URL, data=data,
                                          headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=4):
+            with _RELAY_OPENER.open(req, timeout=4):
                 pass
             return self._json(200, {"ok": True, "relayed": True})
         except Exception:
