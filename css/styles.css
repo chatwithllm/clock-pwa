@@ -434,3 +434,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 
 /* Off-screen capture surface for camera presence — kept out of layout/view. */
 .presence-cam{ position:fixed; width:1px; height:1px; opacity:0; pointer-events:none; left:-9999px; }
+
+/* Typed alert icon (overlay + banner), blinking — calmed under reduced-motion. */
+.alert-card .alert-icon{ font-size:clamp(40px,12vmin,110px); line-height:1; margin-bottom:.15em; }
+.alert-banner .alert-bicon{ margin-right:.4em; }
+@media (prefers-reduced-motion: no-preference){
+  .alert-card .alert-icon, .alert-banner .alert-bicon{ animation:alertBlink 1s steps(1,end) infinite; }
+}
+@keyframes alertBlink{ 0%,60%{opacity:1} 61%,100%{opacity:.25} }

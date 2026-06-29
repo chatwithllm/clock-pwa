@@ -10,7 +10,7 @@ import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX } from './weatherfx.js';
 import { weatherColor } from './feelcolor.js';
-import { alertView } from './alertview.js';
+import { alertView, alertIcon } from './alertview.js';
 import { Presence } from './presence.js';
 import { SunArc } from './sunarc.js';
 
@@ -83,6 +83,7 @@ const app = {
   alertActive: false,
   presence: null,
   presentNow: true,
+  _lastPresencePostMs: -Infinity,
   snapshotToken: '',
   reduceMotion: false,
   state: REST,
@@ -252,7 +253,23 @@ function checkNightSchedule(){
 }
 
 // Presence -> brightness. Re-run the dim decision with the new presence input.
+const PRESENCE_POST_MIN_MS = 5000;
+function postPresence(present){
+  try {
+    if (typeof fetch !== 'function') return;
+    const room = app.settings && app.settings.profile;
+    if (!room || room === 'None') return;                 // no room -> nothing to report
+    const now = Date.now();
+    if (now - app._lastPresencePostMs < PRESENCE_POST_MIN_MS) return;
+    app._lastPresencePostMs = now;
+    fetch('api/presence', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ room: room, present: !!present }),
+    }).catch(() => {});   // sidecar relays or drops; failure never affects the clock
+  } catch(_){}
+}
 function applyPresence(present){
+  if (present !== app.presentNow) { try { postPresence(present); } catch(_){} }
   app.presentNow = present;
   try { checkNightSchedule(); } catch(_){}
 }
@@ -715,6 +732,7 @@ function renderAlerts(){
     if (overlay){
       if (criticals.length){
         const c = criticals[0];
+        $('alertIcon').textContent = alertIcon(c.type);
         $('alertTitle').textContent = c.title || 'Alert';
         $('alertMessage').textContent = c.message || '';
         $('alertTime').textContent = fmtAlertTime(c.ts);
@@ -725,8 +743,9 @@ function renderAlerts(){
     if (banner){
       if (warnings.length){
         const w = warnings[0];
-        banner.textContent = (w.title ? w.title + ' — ' : '') + (w.message || '')
-          + (warnings.length > 1 ? ('  (+' + (warnings.length - 1) + ')') : '');
+        banner.innerHTML = '<span class="alert-bicon">' + alertIcon(w.type) + '</span>'
+          + escHtml((w.title ? w.title + ' — ' : '') + (w.message || '')
+            + (warnings.length > 1 ? ('  (+' + (warnings.length - 1) + ')') : ''));
         banner.hidden = false;
       } else banner.hidden = true;
     }

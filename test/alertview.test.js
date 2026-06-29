@@ -30,3 +30,18 @@ test('garbage input yields empty array', () => {
   assert.deepEqual(alertView(null, 'x'), []);
   assert.deepEqual(alertView('nope', 'x'), []);
 });
+
+import { alertIcon } from '../js/alertview.js';
+
+test('alertIcon: known types map to emoji', () => {
+  assert.equal(alertIcon('water_leak'), '💧');
+  assert.equal(alertIcon('door'), '🚪');
+  assert.equal(alertIcon('security'), '🔒');
+  assert.equal(alertIcon('smoke'), '🔥');
+});
+
+test('alertIcon: unknown / missing -> warning default', () => {
+  assert.equal(alertIcon('nope'), '⚠️');
+  assert.equal(alertIcon(undefined), '⚠️');
+  assert.equal(alertIcon(null), '⚠️');
+});

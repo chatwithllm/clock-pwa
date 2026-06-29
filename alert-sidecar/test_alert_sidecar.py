@@ -56,6 +56,19 @@ class LogicTests(unittest.TestCase):
         a, _ = A.validate_alert({"key": "k3", "title": "a", "message": "1"})
         self.assertIsNone(A.upsert(a))  # cap = 3
 
+    def test_validate_accepts_type(self):
+        a, err = A.validate_alert({"key": "k", "title": "t", "message": "m", "type": "water_leak"})
+        self.assertIsNone(err)
+        self.assertEqual(a["type"], "water_leak")
+
+    def test_validate_default_type_absent(self):
+        a, _ = A.validate_alert({"key": "k", "title": "t", "message": "m"})
+        self.assertNotIn("type", a)
+
+    def test_validate_rejects_bad_type(self):
+        _, err = A.validate_alert({"key": "k", "title": "t", "message": "m", "type": "Bad Type!"})
+        self.assertIsNotNone(err)
+
 
 class ServerTests(unittest.TestCase):
     def setUp(self):
@@ -194,3 +207,77 @@ class SnapshotTests(unittest.TestCase):
             _t.sleep(0.01)
         room = os.path.join(self.dir, "Theater")
         self.assertLessEqual(len(os.listdir(room)), 3)   # MAX_PER_ROOM
+
+
+import urllib.parse
+
+
+class PresenceTests(unittest.TestCase):
+    def setUp(self):
+        self.received = []
+        outer = self
+        class HA(__import__('http.server', fromlist=['BaseHTTPRequestHandler']).BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+            def do_POST(self):
+                n = int(self.headers.get('Content-Length', '0'))
+                outer.received.append(json.loads(self.rfile.read(n) or b'{}'))
+                self.send_response(200); self.send_header('Content-Length', '0'); self.end_headers()
+        self.ha = ThreadingHTTPServer(('127.0.0.1', 0), HA)
+        threading.Thread(target=self.ha.serve_forever, daemon=True).start()
+        self.ha_url = f"http://127.0.0.1:{self.ha.server_address[1]}/hook"
+        self.srv = ThreadingHTTPServer(('127.0.0.1', 0), A.Handler)
+        self.port = self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.srv.shutdown(); self.srv.server_close()
+        self.ha.shutdown(); self.ha.server_close()
+        A.HA_WEBHOOK_URL = ""
+
+    def _post(self, body):
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}/api/presence",
+                                     data=json.dumps(body).encode(), method="POST")
+        try:
+            with urllib.request.urlopen(req) as r: return r.status, json.load(r)
+        except urllib.error.HTTPError as e:
+            with e: return e.code, json.load(e)
+
+    def test_no_webhook_is_noop(self):
+        A.HA_WEBHOOK_URL = ""
+        code, body = self._post({"room": "Kitchen", "present": True})
+        self.assertEqual(code, 200)
+        self.assertFalse(body["relayed"])
+
+    def test_relays_to_ha(self):
+        A.HA_WEBHOOK_URL = self.ha_url
+        code, body = self._post({"room": "Kitchen", "present": True})
+        self.assertEqual(code, 200)
+        self.assertTrue(body["relayed"])
+        self.assertEqual(self.received[-1], {"room": "Kitchen", "present": True})
+
+    def test_bad_body_400(self):
+        A.HA_WEBHOOK_URL = self.ha_url
+        self.assertEqual(self._post({"room": "Kitchen"})[0], 400)          # missing present
+        self.assertEqual(self._post({"present": True})[0], 400)            # missing room
+        self.assertEqual(self._post({"room": "x/y", "present": True})[0], 400)  # bad room
+
+    def test_relay_does_not_follow_redirects(self):
+        import http.server, socketserver
+        hits = []
+        class Redir(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+            def do_POST(self):
+                hits.append(self.path)
+                self.send_response(302)
+                self.send_header("Location", "http://127.0.0.1:1/evil")
+                self.send_header("Content-Length", "0"); self.end_headers()
+        rsrv = ThreadingHTTPServer(("127.0.0.1", 0), Redir)
+        threading.Thread(target=rsrv.serve_forever, daemon=True).start()
+        try:
+            A.HA_WEBHOOK_URL = f"http://127.0.0.1:{rsrv.server_address[1]}/hook"
+            code, body = self._post({"room": "Kitchen", "present": True})
+            self.assertEqual(code, 200)
+            self.assertFalse(body["relayed"])      # 302 not followed -> treated as failure
+            self.assertEqual(len(hits), 1)         # only the original POST, no redirect chase
+        finally:
+            rsrv.shutdown(); rsrv.server_close()

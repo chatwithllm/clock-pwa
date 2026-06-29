@@ -13,3 +13,12 @@ export function alertView(list, profile){
   out.sort((x, y) => rank(x.severity) - rank(y.severity) || (Number(y.ts) || 0) - (Number(x.ts) || 0));
   return out;
 }
+
+// Map a Home-Assistant alert `type` to a display emoji. Unknown/missing -> warning.
+const ALERT_ICONS = {
+  water_leak: '💧', door: '🚪', window: '🪟', security: '🔒', smoke: '🔥',
+  co: '☣️', motion: '🚶', freeze: '🧊', power: '🔌', temperature: '🌡️',
+};
+export function alertIcon(type){
+  return ALERT_ICONS[type] || '⚠️';
+}

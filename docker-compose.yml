@@ -42,6 +42,9 @@ services:
       ALERTS_FILE: "/data/alerts.json"
       SNAPSHOT_TOKEN: "${SNAPSHOT_TOKEN:-}"
       SNAPSHOTS_DIR: "/data/snapshots"
+      # Home Assistant webhook the sidecar relays presence to (server-side, no CORS).
+      # Unset = presence relay is a no-op. e.g. https://ha.local:8123/api/webhook/<id>
+      HA_WEBHOOK_URL: "${HA_WEBHOOK_URL:-}"
     volumes:
       - alertdata:/data
       - snapshots:/data/snapshots

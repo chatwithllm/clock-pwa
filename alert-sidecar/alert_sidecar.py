@@ -3,8 +3,15 @@
 # Zero third-party deps. Owns the alert set: validates, persists atomically
 # (temp + os.replace under a lock), and serves the current list as JSON.
 import hmac, json, os, re, tempfile, threading, time
+import urllib.request, urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None   # never follow redirects on the relay (SSRF hardening)
+
+_RELAY_OPENER = urllib.request.build_opener(_NoRedirect)
 
 TOKEN = os.environ.get("ALERT_API_TOKEN", "").strip()
 ALERTS_FILE = os.environ.get("ALERTS_FILE", "/data/alerts.json")
@@ -20,6 +27,7 @@ SNAPSHOT_RETENTION_DAYS = int(os.environ.get("SNAPSHOT_RETENTION_DAYS", "30"))
 SNAPSHOT_MAX_PER_ROOM = int(os.environ.get("SNAPSHOT_MAX_PER_ROOM", "1000"))
 # No '.' at all (blocks '.', '..', dotfiles) and must start with an alnum/underscore.
 PROFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9 _\-]{0,63}$")
+HA_WEBHOOK_URL = os.environ.get("HA_WEBHOOK_URL", "").strip()
 
 
 def snap_name(ms):
@@ -94,8 +102,13 @@ def validate_alert(body):
     target = body.get("target", "all")
     if not isinstance(target, str) or len(target) > 64:
         return None, "target must be a string <=64 chars"
-    return {"key": key, "severity": sev, "title": title,
-            "message": msg, "target": target}, None
+    typ = body.get("type")
+    if typ is not None and not re.match(r"^[a-z0-9_]{1,32}$", str(typ)):
+        return None, "type must match ^[a-z0-9_]{1,32}$"
+    out = {"key": key, "severity": sev, "title": title, "message": msg, "target": target}
+    if typ is not None:
+        out["type"] = typ
+    return out, None
 
 
 def upsert(alert):
@@ -203,6 +216,26 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return None
 
+    def _handle_presence(self):
+        body = self._body()
+        if not isinstance(body, dict):
+            return self._json(400, {"error": "bad body"})
+        room = body.get("room")
+        present = body.get("present")
+        if not isinstance(room, str) or not PROFILE_RE.match(room) or not isinstance(present, bool):
+            return self._json(400, {"error": "room (profile) + present(bool) required"})
+        if not HA_WEBHOOK_URL:
+            return self._json(200, {"ok": True, "relayed": False})
+        try:
+            data = json.dumps({"room": room, "present": present}).encode()
+            req = urllib.request.Request(HA_WEBHOOK_URL, data=data,
+                                         headers={"Content-Type": "application/json"}, method="POST")
+            with _RELAY_OPENER.open(req, timeout=4):
+                pass
+            return self._json(200, {"ok": True, "relayed": True})
+        except Exception:
+            return self._json(200, {"ok": True, "relayed": False})  # HA down -> never error the kiosk
+
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/api/health":
@@ -212,11 +245,13 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "not found"})
 
     def do_POST(self):
-        if urlparse(self.path).path == "/api/snapshot":
+        path = urlparse(self.path).path
+        if path == "/api/presence":
+            return self._handle_presence()
+        if path == "/api/snapshot":
             return self._handle_snapshot()
         if not self._guard():
             return
-        path = urlparse(self.path).path
         body = self._body()
         if body is None:
             return self._json(400, {"error": "invalid JSON"})
