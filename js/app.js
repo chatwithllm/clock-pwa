@@ -484,15 +484,21 @@ function syncDimButton(){
 function updateSecondClock(){
   try {
     const el = $('secondClock'); if (!el) return;
+    // Keep el.hidden + the #app `has-second` class in sync so the layout can
+    // reserve space for the badge (landscape) only when it's actually shown.
+    const setBadge = (vis) => {
+      el.hidden = !vis;
+      const a = $('app'); if (a) a.classList.toggle('has-second', vis);
+    };
     const z = SECOND_ZONES.find(x => x.id === app.settings.secondTz);
-    if (!z || z.id === 'off' || !z.tz){ el.hidden = true; return; }
+    if (!z || z.id === 'off' || !z.tz){ setBadge(false); return; }
     const now = nowDate();
     let time;
     try {
       time = new Intl.DateTimeFormat(undefined,
         { timeZone: z.tz, hour:'numeric', minute:'2-digit', hour12: !app.settings.hour24 }).format(now);
-    } catch(_) { el.hidden = true; return; }   // zone unsupported on this engine
-    el.hidden = false;
+    } catch(_) { setBadge(false); return; }   // zone unsupported on this engine
+    setBadge(true);
     $('secondLabel').textContent = z.label.toUpperCase();
     $('secondTime').textContent = time;
     // Day offset hint (+1d / -1d) relative to device local date.
