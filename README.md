@@ -51,6 +51,10 @@ the next page load). Use one option or the other, not both.
 { "location": { "lat": 39.7684, "lon": -86.1581, "city": "Indianapolis" } }
 ```
 
+> **Don't edit the in-container `config.json` directly** (e.g. `docker exec … nano`). If
+> `CLOCK_LAT`/`CLOCK_LON` are set, the entrypoint **overwrites** that file on the next restart and
+> your edit is lost. Change the compose env vars (Option A) or the mounted host file (Option B).
+
 In the app, **Settings → Location → Server** uses this. Devices that can't geolocate (TVs, or
 boxes on a VLAN with no internet GPS) get the location from the server this way. A user can switch
 **Location → Custom** and enter their own **US ZIP** (e.g. `46204`) or a **city name** instead.
@@ -176,6 +180,13 @@ weather **on the server** and writes it to `weather.json`; those devices read it
 - Devices in **Location → Server** mode prefer `weather.json` automatically (and fall back to the
   direct API, then cache). **Custom**-location devices use the direct API (they need internet for
   their own location).
+
+> **Precipitation-aware condition.** Open-Meteo's `weather_code` over-reports precipitation — it
+> returns *thunderstorm* in hot, humid air even when no rain is falling and the chance is ~0%. The
+> display corrects this: when a rain/storm code is reported but the current precipitation is **0 mm**
+> and the next-hour probability is **< 30%**, it softens to a calm "… possible" label + icon + a calm
+> backdrop instead of an active storm. It never hides a real storm (any active precip or a missing
+> field shows the raw condition).
 
 **One-click install:** because `localhost` is a secure context, the service worker registers
 and Chrome/Edge show an **install icon** in the address bar — click it to install the PWA (or
