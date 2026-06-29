@@ -3,6 +3,7 @@
 # Zero third-party deps. Owns the alert set: validates, persists atomically
 # (temp + os.replace under a lock), and serves the current list as JSON.
 import hmac, json, os, re, tempfile, threading, time
+import urllib.request, urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -20,6 +21,7 @@ SNAPSHOT_RETENTION_DAYS = int(os.environ.get("SNAPSHOT_RETENTION_DAYS", "30"))
 SNAPSHOT_MAX_PER_ROOM = int(os.environ.get("SNAPSHOT_MAX_PER_ROOM", "1000"))
 # No '.' at all (blocks '.', '..', dotfiles) and must start with an alnum/underscore.
 PROFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9 _\-]{0,63}$")
+HA_WEBHOOK_URL = os.environ.get("HA_WEBHOOK_URL", "").strip()
 
 
 def snap_name(ms):
@@ -208,6 +210,26 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return None
 
+    def _handle_presence(self):
+        body = self._body()
+        if not isinstance(body, dict):
+            return self._json(400, {"error": "bad body"})
+        room = body.get("room")
+        present = body.get("present")
+        if not isinstance(room, str) or not PROFILE_RE.match(room) or not isinstance(present, bool):
+            return self._json(400, {"error": "room (profile) + present(bool) required"})
+        if not HA_WEBHOOK_URL:
+            return self._json(200, {"ok": True, "relayed": False})
+        try:
+            data = json.dumps({"room": room, "present": present}).encode()
+            req = urllib.request.Request(HA_WEBHOOK_URL, data=data,
+                                         headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=4):
+                pass
+            return self._json(200, {"ok": True, "relayed": True})
+        except Exception:
+            return self._json(200, {"ok": True, "relayed": False})  # HA down -> never error the kiosk
+
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/api/health":
@@ -217,11 +239,13 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "not found"})
 
     def do_POST(self):
-        if urlparse(self.path).path == "/api/snapshot":
+        path = urlparse(self.path).path
+        if path == "/api/presence":
+            return self._handle_presence()
+        if path == "/api/snapshot":
             return self._handle_snapshot()
         if not self._guard():
             return
-        path = urlparse(self.path).path
         body = self._body()
         if body is None:
             return self._json(400, {"error": "invalid JSON"})
