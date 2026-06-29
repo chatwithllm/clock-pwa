@@ -249,12 +249,24 @@ photo of whoever walks up. Both are **opt-in and off by default**, and need
   > Anyone on your network who reads that token could write images to the NAS
   > (bounded by the per-room retention cap). Keep it on a trusted LAN / behind
   > HTTPS; don't expose `/api/snapshot` or `/snapshot.json` to the internet.
-- **TrueNAS / NAS setup:** create a dataset (e.g. `clock-snapshots`) and an **NFS
-  share** scoped to the Docker host's IP, then fill the `snapshots` volume in
-  `docker-compose.yml` (`addr=<truenas-ip>`,
-  `device=:/mnt/<pool>/<dataset>/clock-snapshots`). SMB/CIFS or a host bind-mount
-  work too. Browse images straight on the NAS — one subfolder per room. If the NAS
-  is down, uploads fail quietly and nothing else breaks. Retention defaults: keep
+- **Storage — local by default, NAS optional.** Out of the box the `snapshots`
+  volume is a plain local Docker volume, so the stack comes up with **no NAS
+  config** (and snapshots are off by default anyway). To store on **TrueNAS**:
+  create a dataset (e.g. `clock-snapshots`) + an **NFS share** scoped to the Docker
+  host's IP, then point the `snapshots` volume at it — either edit it in
+  `docker-compose.yml` or (cleaner) add a `docker-compose.override.yml`:
+  ```yaml
+  volumes:
+    snapshots:
+      driver: local
+      driver_opts:
+        type: nfs
+        o: "addr=192.168.x.y,nfsvers=4,rw,soft"   # your TrueNAS IP
+        device: ":/mnt/<pool>/<dataset>/clock-snapshots"
+  ```
+  SMB/CIFS or a host bind-mount work too. Browse images straight on the NAS — one
+  subfolder per room. If the NAS is down, uploads fail quietly and nothing else
+  breaks. Retention defaults: keep
   30 days / 1000 per room (`SNAPSHOT_RETENTION_DAYS`, `SNAPSHOT_MAX_PER_ROOM`),
   1 MiB per-image cap (`SNAPSHOT_MAX_BYTES`).
 
