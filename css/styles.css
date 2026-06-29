@@ -102,6 +102,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
    outer inset is preserved on .app, this only trims the inner cell padding). */
 @media (orientation:landscape){ .stage{padding:clamp(2px,1vmin,14px)} }
 .app.force-landscape .stage{padding:clamp(2px,1vmin,14px)}
+/* When a second-clock badge is shown, reserve a top strip in landscape so the
+   hero clock drops below the fixed top-right badge instead of overlapping it.
+   The badge is a constant-size overlay (bottom edge ~92px), so the reserve is a
+   constant too — independent of viewport height and of whether the date row shows. */
+@media (orientation:landscape){
+  .app.has-second .stage{ padding-top:calc(env(safe-area-inset-top,0px) + 96px) }
+}
+.app.force-landscape.has-second .stage{ padding-top:calc(env(safe-area-inset-top,0px) + 96px) }
 .weather{grid-area:weather;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:flex-start}
 
 /* Landscape: weather lays out as a centered horizontal footer strip.
