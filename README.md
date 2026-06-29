@@ -129,7 +129,7 @@ this repo) so the bearer token isn't sent in clear text over the network.
 
 | Method & path | Body | Effect |
 | --- | --- | --- |
-| `POST /api/alert` | `{key, severity?, title, message, target?}` | Raise/refresh by `key` (`severity` `warning`\|`critical`, default `critical`; `target` a room profile or `all`) |
+| `POST /api/alert` | `{key, severity?, type?, title, message, target?}` | Raise/refresh by `key` (`severity` `warning`\|`critical`, default `critical`; `target` a room profile or `all`) |
 | `POST /api/alert/clear` | `{key}` | Clear that alert |
 | `DELETE /api/alert?key=…` | — | Clear that alert |
 | `GET /alerts.json` | — | Current active alerts (open, what devices read) |
@@ -158,14 +158,15 @@ to the alert banner/overlay. Supported values:
 | `type` | Icon | Use case |
 | --- | --- | --- |
 | `water_leak` | 💧 | Leak / flood sensor |
-| `smoke` | 🚨 | Smoke / CO detector |
-| `motion` | 👤 | Motion / intruder |
-| `door` | 🚪 | Door / window open |
-| `lock` | 🔒 | Lock status |
-| `fire` | 🔥 | Fire alarm |
-| `camera` | 📷 | Camera event |
-| `temperature` | 🌡️ | Over-temp / freeze |
-| `power` | ⚡ | Power / UPS event |
+| `door` | 🚪 | Door open |
+| `window` | 🪟 | Window open |
+| `security` | 🔒 | Security / lock status |
+| `smoke` | 🔥 | Smoke detector |
+| `co` | ☣️ | CO detector |
+| `motion` | 🚶 | Motion / intruder |
+| `freeze` | 🧊 | Freeze / low temp |
+| `power` | 🔌 | Power / UPS event |
+| `temperature` | 🌡️ | Over-temp sensor |
 | *(unknown/omitted)* | ⚠️ | Generic fallback |
 
 Example automation: leak sensor `on` → `clock_alert` with `severity: critical`,
@@ -212,6 +213,7 @@ automation:
     trigger:
       platform: webhook
       webhook_id: "<your-webhook-id>"   # matches the URL above
+      allowed_methods: [POST]
     action:
       - choose:
           - conditions:
