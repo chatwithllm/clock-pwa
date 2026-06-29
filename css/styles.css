@@ -237,12 +237,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   align-self:flex-start;margin-top:calc(var(--flip-h,120px)*.06);letter-spacing:.04em}
 
 /* ---- Block Matrix (dot-matrix LED) style ---- */
-.block{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;
+.block{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:clamp(8px,2.4vmin,22px)}
 .block-date{font-size:clamp(12px,2.8vmin,24px);letter-spacing:.14em;text-transform:uppercase;
-  color:var(--fg-dim);font-weight:600;order:-1}
-/* SVG fits its cell by viewBox; capped so it never overflows siblings */
-.block-svg{display:block;max-width:100%;max-height:min(100%,52vh)}
+  color:var(--fg-dim);font-weight:600;order:-1;flex:0 0 auto}
+/* SVG fits its cell by viewBox (meet). flex:1 + min-height:0 lets it SHRINK to the
+   available height so it never overflows the date/weather/chrome on short landscape;
+   52vh keeps it from getting absurdly tall on roomy portrait. */
+.block-svg{display:block;width:100%;flex:1 1 auto;min-height:0;max-width:100%;max-height:min(100%,52vh)}
 .led{transform-box:fill-box;transform-origin:center;
   transition:transform .35s ease,opacity .35s ease,fill .35s ease}
 .led.on{fill:var(--led-on);opacity:1;transform:scale(1);
