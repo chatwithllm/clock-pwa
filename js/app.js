@@ -5,7 +5,7 @@
 import { loadSettings, saveSettings, DEFAULT_LOCATION } from './settings.js';
 import { sourceToModes, resolveServerSource } from './source.js';
 import { Clock, sampleFPS, setClockOffset, nowDate } from './clock.js';
-import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, wmoInfo, loadCache, getZoneWeather } from './weather.js';
+import { getWeather, getServerWeather, geocodeCity, zipLookup, bothTemps, effectiveCondition, loadCache, getZoneWeather } from './weather.js';
 import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX } from './weatherfx.js';
@@ -214,7 +214,7 @@ function applyDisplay(){
   if (!app.fx) return;
   if (isDynamic()){
     app.fx.setActive(true);
-    if (app.lastWeather){ app.fx.setCondition(app.lastWeather.code); if (!app.deepDim) applyTint(app.lastWeather); }
+    if (app.lastWeather){ app.fx.setCondition(effectiveCondition(app.lastWeather.code, app.lastWeather.precip, app.lastWeather.precipProb).code); if (!app.deepDim) applyTint(app.lastWeather); }
   } else {
     app.fx.setActive(false);
     clearTint();
@@ -369,7 +369,7 @@ async function refreshWeather(){
     if (!w) w = await getWeather(loc);
     if (w){
       app.lastWeather = w; paintWeather(w);
-      if (app.fx && isDynamic()){ app.fx.setCondition(w.code); if (!app.deepDim) applyTint(w); }
+      if (app.fx && isDynamic()){ app.fx.setCondition(effectiveCondition(w.code, w.precip, w.precipProb).code); if (!app.deepDim) applyTint(w); }
       updateSun();
     }
     else paintWeatherError();
@@ -408,7 +408,8 @@ function paintWeather(w){
           hi = bothTemps(w.hiC), lo = bothTemps(w.loC);
     $('wxEmpty').hidden = true;
     $('wxCard').hidden = false;
-    const [icon, label] = wmoInfo(w.code);
+    const eff = effectiveCondition(w.code, w.precip, w.precipProb);
+    const icon = eff.icon, label = eff.label;
     $('wxIcon').textContent = icon;
     $('wxTemp').innerHTML =
       '<span class="big">' + cur.f + '°<span class="u">F</span></span>' +
@@ -1126,7 +1127,7 @@ async function boot(){
     const cached = loadCache();
     if (cached){
       app.lastWeather = Object.assign({}, cached, {stale:true}); paintWeather(app.lastWeather);
-      if (app.fx && isDynamic()){ app.fx.setCondition(cached.code); if (!app.deepDim) applyTint(cached); }
+      if (app.fx && isDynamic()){ app.fx.setCondition(effectiveCondition(cached.code, cached.precip, cached.precipProb).code); if (!app.deepDim) applyTint(cached); }
       updateSun();
     }
   } catch(_){}

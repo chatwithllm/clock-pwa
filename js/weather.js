@@ -24,6 +24,31 @@ export function wmoInfo(code){
   return WMO[code] || ['·','—'];
 }
 
+// Open-Meteo's weather_code over-reports precipitation (e.g. thunderstorm in
+// hot/humid air with 0mm falling and ~0% chance). When a precip code is reported
+// but it's actually dry now AND unlikely soon, soften the icon/label/backdrop to a
+// calm "… possible" state. Fail-safe: any missing field → show the raw condition
+// (never hide a real storm). Pure; precip in mm, precipProb in %.
+// Precip-code family -> the softened "… possible" label.
+const PRECIP_FAMILY = [
+  { lo:51, hi:57, label:'Drizzle possible' },
+  { lo:61, hi:67, label:'Rain possible' },
+  { lo:80, hi:82, label:'Showers possible' },
+  { lo:71, hi:77, label:'Snow possible' },
+  { lo:85, hi:86, label:'Snow possible' },
+  { lo:95, hi:99, label:'Storms possible' },
+];
+export function effectiveCondition(code, precip, precipProb){
+  const c = Number(code);
+  const fam = PRECIP_FAMILY.find(f => c >= f.lo && c <= f.hi);
+  const dry = !!fam
+    && precip === 0
+    && Number.isFinite(precipProb) && precipProb < 30;
+  if (dry) return { code: 2, icon: '⛅', label: fam.label, dry: true };
+  const [icon, label] = wmoInfo(code);
+  return { code, icon, label, dry: false };
+}
+
 function safeLSGet(k){ try { return localStorage.getItem(k); } catch(_){ return null; } }
 function safeLSSet(k,v){ try { localStorage.setItem(k,v); return true; } catch(_){ return false; } }
 
@@ -54,11 +79,21 @@ async function fetchJSON(url, ms = 12000){
 export function normalizeForecast(j, loc){
   const cur = j.current || {};
   const daily = j.daily || {};
+  // Current-hour precipitation probability from the hourly array (timezone=auto
+  // aligns hourly to local midnight, so the index is the hour of current.time).
+  let precipProb = null;
+  const hp = j.hourly && j.hourly.precipitation_probability;
+  if (Array.isArray(hp) && cur.time){
+    const h = parseInt(String(cur.time).slice(11, 13), 10);
+    if (Number.isFinite(h) && h >= 0 && h < hp.length) precipProb = hp[h];
+  }
   return {
     tempC: cur.temperature_2m,
     feelsC: cur.apparent_temperature,
     code: cur.weather_code,
     rh: cur.relative_humidity_2m,
+    precip: cur.precipitation,
+    precipProb: precipProb,
     hiC: daily.temperature_2m_max ? daily.temperature_2m_max[0] : null,
     loC: daily.temperature_2m_min ? daily.temperature_2m_min[0] : null,
     // Sunrise/sunset are naive ISO strings in the LOCATION's timezone (timezone=auto).
@@ -80,8 +115,9 @@ export function normalizeForecast(j, loc){
  */
 export async function getWeather(loc){
   const url = `${FORECAST}?latitude=${loc.lat}&longitude=${loc.lon}`
-    + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code`
+    + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,precipitation`
     + `&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset`
+    + `&hourly=precipitation_probability`
     + `&temperature_unit=celsius&timezone=auto&forecast_days=1`;
   try {
     const data = normalizeForecast(await fetchJSON(url), loc);
@@ -159,8 +195,9 @@ export async function getZoneWeather(zone){
   const key = 'clockpwa.weather2.' + zone.id;
   const loc = { lat:zone.lat, lon:zone.lon, city:zone.city || zone.label };
   const url = `${FORECAST}?latitude=${loc.lat}&longitude=${loc.lon}`
-    + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code`
+    + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,precipitation`
     + `&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset`
+    + `&hourly=precipitation_probability`
     + `&temperature_unit=celsius&timezone=auto&forecast_days=1`;
   try {
     const data = normalizeForecast(await fetchJSON(url), loc);
