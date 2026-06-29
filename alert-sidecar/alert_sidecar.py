@@ -94,8 +94,13 @@ def validate_alert(body):
     target = body.get("target", "all")
     if not isinstance(target, str) or len(target) > 64:
         return None, "target must be a string <=64 chars"
-    return {"key": key, "severity": sev, "title": title,
-            "message": msg, "target": target}, None
+    typ = body.get("type")
+    if typ is not None and not re.match(r"^[a-z0-9_]{1,32}$", str(typ)):
+        return None, "type must match ^[a-z0-9_]{1,32}$"
+    out = {"key": key, "severity": sev, "title": title, "message": msg, "target": target}
+    if typ is not None:
+        out["type"] = typ
+    return out, None
 
 
 def upsert(alert):

@@ -56,6 +56,19 @@ class LogicTests(unittest.TestCase):
         a, _ = A.validate_alert({"key": "k3", "title": "a", "message": "1"})
         self.assertIsNone(A.upsert(a))  # cap = 3
 
+    def test_validate_accepts_type(self):
+        a, err = A.validate_alert({"key": "k", "title": "t", "message": "m", "type": "water_leak"})
+        self.assertIsNone(err)
+        self.assertEqual(a["type"], "water_leak")
+
+    def test_validate_default_type_absent(self):
+        a, _ = A.validate_alert({"key": "k", "title": "t", "message": "m"})
+        self.assertNotIn("type", a)
+
+    def test_validate_rejects_bad_type(self):
+        _, err = A.validate_alert({"key": "k", "title": "t", "message": "m", "type": "Bad Type!"})
+        self.assertIsNotNone(err)
+
 
 class ServerTests(unittest.TestCase):
     def setUp(self):
