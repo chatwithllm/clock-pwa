@@ -83,6 +83,7 @@ const app = {
   alertActive: false,
   presence: null,
   presentNow: true,
+  _lastPresencePostMs: -Infinity,
   snapshotToken: '',
   reduceMotion: false,
   state: REST,
@@ -252,7 +253,23 @@ function checkNightSchedule(){
 }
 
 // Presence -> brightness. Re-run the dim decision with the new presence input.
+const PRESENCE_POST_MIN_MS = 5000;
+function postPresence(present){
+  try {
+    if (typeof fetch !== 'function') return;
+    const room = app.settings && app.settings.profile;
+    if (!room || room === 'None') return;                 // no room -> nothing to report
+    const now = Date.now();
+    if (now - app._lastPresencePostMs < PRESENCE_POST_MIN_MS) return;
+    app._lastPresencePostMs = now;
+    fetch('api/presence', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ room: room, present: !!present }),
+    }).catch(() => {});   // sidecar relays or drops; failure never affects the clock
+  } catch(_){}
+}
 function applyPresence(present){
+  if (present !== app.presentNow) { try { postPresence(present); } catch(_){} }
   app.presentNow = present;
   try { checkNightSchedule(); } catch(_){}
 }
