@@ -54,12 +54,19 @@ services:
 
 volumes:
   alertdata:
-  # Arrival snapshots, stored on the NAS. Fill in your TrueNAS NFS export:
-  #   addr=<truenas-ip>, device=:/mnt/<pool>/<dataset>/clock-snapshots
-  # (SMB/CIFS or a host bind-mount are alternatives — see the README.)
+  # Arrival snapshots. Defaults to a plain local Docker volume so the stack comes
+  # up with ZERO config (snapshots are opt-in and off by default anyway).
+  #
+  # To store snapshots on a NAS instead, point this volume at your export — either
+  # edit it here, or (cleaner) drop a docker-compose.override.yml next to this file:
+  #
+  #   volumes:
+  #     snapshots:
+  #       driver: local
+  #       driver_opts:
+  #         type: nfs
+  #         o: "addr=192.168.x.y,nfsvers=4,rw,soft"     # your TrueNAS IP
+  #         device: ":/mnt/<pool>/<dataset>/clock-snapshots"
+  #
+  # SMB/CIFS or a host bind-mount also work — see the README.
   snapshots:
-    driver: local
-    driver_opts:
-      type: nfs
-      o: "addr=TRUENAS_IP,nfsvers=4,rw,soft"
-      device: ":/mnt/POOL/DATASET/clock-snapshots"
