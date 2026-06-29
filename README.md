@@ -143,7 +143,7 @@ rest_command:
     method: POST
     headers: { Authorization: "Bearer !secret clock_alert_token" }
     content_type: "application/json"
-    payload: '{"key":"{{ key }}","severity":"{{ severity }}","title":"{{ title }}","message":"{{ message }}"}'
+    payload: '{"key":"{{ key }}","severity":"{{ severity }}","type":"{{ type }}","title":"{{ title }}","message":"{{ message }}"}'
   clock_alert_clear:
     url: "https://clock.example.com/api/alert/clear"
     method: POST
@@ -152,10 +152,94 @@ rest_command:
     payload: '{"key":"{{ key }}"}'
 ```
 
-Example automation: leak sensor `on` → `clock_alert` with `severity: critical`;
-`off` → `clock_alert_clear`. Use `warning` for low-stakes events, `critical` for
-safety. If HA ever fails to clear a stuck alert, the **admin page → Active Alerts**
-card can clear it by hand.
+**Alert `type` — typed icons.** The optional `type` field adds a contextual icon
+to the alert banner/overlay. Supported values:
+
+| `type` | Icon | Use case |
+| --- | --- | --- |
+| `water_leak` | 💧 | Leak / flood sensor |
+| `smoke` | 🚨 | Smoke / CO detector |
+| `motion` | 👤 | Motion / intruder |
+| `door` | 🚪 | Door / window open |
+| `lock` | 🔒 | Lock status |
+| `fire` | 🔥 | Fire alarm |
+| `camera` | 📷 | Camera event |
+| `temperature` | 🌡️ | Over-temp / freeze |
+| `power` | ⚡ | Power / UPS event |
+| *(unknown/omitted)* | ⚠️ | Generic fallback |
+
+Example automation: leak sensor `on` → `clock_alert` with `severity: critical`,
+`type: water_leak`; `off` → `clock_alert_clear`. Use `warning` for low-stakes
+events, `critical` for safety. If HA ever fails to clear a stuck alert, the
+**admin page → Active Alerts** card can clear it by hand.
+
+### Presence → Home Assistant
+
+When a kiosk has **Settings → Presence** enabled, it posts a `{room, present}`
+signal to the sidecar each time someone arrives or leaves. You can forward these
+transitions to a Home Assistant webhook so HA can act on room occupancy.
+
+**Setup:**
+
+```bash
+# .env (or docker-compose.override.yml) — add alongside ALERT_API_TOKEN:
+HA_WEBHOOK_URL=https://ha.local:8123/api/webhook/<your-webhook-id>
+docker compose up -d
+```
+
+The sidecar reads `HA_WEBHOOK_URL` from its environment; when set it POSTs
+`{"room": "<profile>", "present": true|false}` to that URL on every transition.
+When unset the relay is a silent no-op (the device still dims locally).
+
+**Endpoint** (no auth required — trusted-LAN design):
+
+| Method & path | Body | Effect |
+| --- | --- | --- |
+| `POST /api/presence` | `{room, present}` | Relay to HA webhook (if configured) |
+
+> **LAN trust:** `/api/presence` has no token requirement by design — the
+> display is on a trusted LAN and adding a secret here would require embedding
+> it in every kiosk. Keep the sidecar off the public internet.
+
+**Presence off when profile = None.** If a device has no profile set (Settings →
+Profile = None) it never posts presence transitions — there is no room to report.
+
+**Home Assistant webhook automation** (`automations.yaml`):
+
+```yaml
+automation:
+  - alias: "Clock presence webhook"
+    trigger:
+      platform: webhook
+      webhook_id: "<your-webhook-id>"   # matches the URL above
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.json.present }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: "input_boolean.room_{{ trigger.json.room | lower | replace(' ','_') }}_occupied"
+          - conditions:
+              - condition: template
+                value_template: "{{ not trigger.json.present }}"
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: "input_boolean.room_{{ trigger.json.room | lower | replace(' ','_') }}_occupied"
+```
+
+Create a matching `input_boolean` for each room (e.g. `input_boolean.room_kitchen_occupied`).
+You can then build a template binary sensor on top of it for cleaner automations:
+
+```yaml
+template:
+  - binary_sensor:
+      - name: "Kitchen occupied"
+        device_class: occupancy
+        state: "{{ is_state('input_boolean.room_kitchen_occupied', 'on') }}"
+```
 
 ### Custom profiles
 
