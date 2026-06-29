@@ -10,7 +10,7 @@ import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX } from './weatherfx.js';
 import { weatherColor } from './feelcolor.js';
-import { alertView } from './alertview.js';
+import { alertView, alertIcon } from './alertview.js';
 import { Presence } from './presence.js';
 import { SunArc } from './sunarc.js';
 
@@ -715,6 +715,7 @@ function renderAlerts(){
     if (overlay){
       if (criticals.length){
         const c = criticals[0];
+        $('alertIcon').textContent = alertIcon(c.type);
         $('alertTitle').textContent = c.title || 'Alert';
         $('alertMessage').textContent = c.message || '';
         $('alertTime').textContent = fmtAlertTime(c.ts);
@@ -725,8 +726,9 @@ function renderAlerts(){
     if (banner){
       if (warnings.length){
         const w = warnings[0];
-        banner.textContent = (w.title ? w.title + ' — ' : '') + (w.message || '')
-          + (warnings.length > 1 ? ('  (+' + (warnings.length - 1) + ')') : '');
+        banner.innerHTML = '<span class="alert-bicon">' + alertIcon(w.type) + '</span>'
+          + escHtml((w.title ? w.title + ' — ' : '') + (w.message || '')
+            + (warnings.length > 1 ? ('  (+' + (warnings.length - 1) + ')') : ''));
         banner.hidden = false;
       } else banner.hidden = true;
     }
