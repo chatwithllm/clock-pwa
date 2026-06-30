@@ -97,6 +97,17 @@ synthesized in-browser, so no audio files are needed. Because browsers require a
 playing audio, each display must enable sound once via **Settings → Sound**; that preference is saved
 in `localStorage` and persists across reloads.
 
+### Home Assistant integration (HACS)
+
+For a native Home Assistant UI instead of raw `rest_command`/`curl` — install
+the [clock-pwa-ha](https://github.com/chatwithllm/clock-pwa-ha) HACS custom
+integration. It polls `GET /alerts.json` and `GET /presence.json` (see below)
+and exposes `sensor.clock_active_alerts`, per-room
+`binary_sensor.clock_presence_<room>` (occupancy), and
+`clock_pwa.send_alert`/`clock_pwa.clear_alert` services — config-flow setup
+(base URL + bearer token), no YAML required. `/alerts.json` and `/presence.json`
+are open GET (served same as today — LAN/HTTPS, no auth).
+
 ### Critical alerts (Home Assistant)
 
 A **bearer-authenticated push API** lets [Home Assistant](https://www.home-assistant.io/)
