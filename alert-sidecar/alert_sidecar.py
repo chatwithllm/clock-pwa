@@ -28,6 +28,8 @@ SNAPSHOT_MAX_PER_ROOM = int(os.environ.get("SNAPSHOT_MAX_PER_ROOM", "1000"))
 # No '.' at all (blocks '.', '..', dotfiles) and must start with an alnum/underscore.
 PROFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9 _\-]{0,63}$")
 HA_WEBHOOK_URL = os.environ.get("HA_WEBHOOK_URL", "").strip()
+PRESENCE_FILE = os.environ.get("PRESENCE_FILE", "/data/presence.json")
+_presence = {}        # room -> {"present": bool, "ts": int}; guarded by _lock
 
 
 def snap_name(ms):
@@ -58,6 +60,39 @@ def prune_room(room_dir):
 
 def now_ms():
     return int(time.time() * 1000)
+
+
+def presence_view(store):
+    return {k: {"present": bool(v.get("present")), "ts": int(v.get("ts", 0))}
+            for k, v in store.items() if isinstance(v, dict)}
+
+
+def _load_presence():
+    try:
+        with open(PRESENCE_FILE) as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            _presence.update(data)
+    except (FileNotFoundError, ValueError, OSError):
+        pass
+
+
+def _write_presence():
+    # Best-effort persistence: never raise (e.g. missing /data) — in-memory state
+    # is the source of truth; the file just survives restarts.
+    tmp = None
+    try:
+        d = os.path.dirname(PRESENCE_FILE) or "."
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=".presence.", suffix=".tmp")
+        with os.fdopen(fd, "w") as f:
+            json.dump(_presence, f)
+        os.replace(tmp, PRESENCE_FILE)
+    except Exception:
+        if tmp:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
 
 def _read():
@@ -224,6 +259,9 @@ class Handler(BaseHTTPRequestHandler):
         present = body.get("present")
         if not isinstance(room, str) or not PROFILE_RE.match(room) or not isinstance(present, bool):
             return self._json(400, {"error": "room (profile) + present(bool) required"})
+        with _lock:
+            _presence[room] = {"present": present, "ts": now_ms()}
+            _write_presence()
         if not HA_WEBHOOK_URL:
             return self._json(200, {"ok": True, "relayed": False})
         try:
@@ -242,6 +280,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True})
         if path == "/alerts.json":
             return self._json(200, _read())
+        if path == "/presence.json":
+            with _lock:
+                return self._json(200, presence_view(_presence))
         return self._json(404, {"error": "not found"})
 
     def do_POST(self):
@@ -282,6 +323,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    _load_presence()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 

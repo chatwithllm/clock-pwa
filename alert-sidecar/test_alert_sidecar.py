@@ -242,6 +242,28 @@ class PresenceTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             with e: return e.code, json.load(e)
 
+    def tmpfile(self):
+        import tempfile, atexit, os
+        fd, p = tempfile.mkstemp(suffix=".json"); os.close(fd)
+        atexit.register(lambda: os.path.exists(p) and os.unlink(p))
+        return p
+
+    def test_presence_stored_and_served(self):
+        A.HA_WEBHOOK_URL = ""              # storage must work even with no relay
+        A.PRESENCE_FILE = self.tmpfile()
+        A._presence.clear()
+        self._post({"room": "Kitchen", "present": True})
+        self._post({"room": "Theater", "present": False})
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/presence.json") as r:
+            m = json.load(r)
+        self.assertTrue(m["Kitchen"]["present"])
+        self.assertFalse(m["Theater"]["present"])
+        self.assertIn("ts", m["Kitchen"])
+
+    def test_presence_view_pure(self):
+        store = {"Kitchen": {"present": True, "ts": 5}}
+        self.assertEqual(A.presence_view(store), {"Kitchen": {"present": True, "ts": 5}})
+
     def test_no_webhook_is_noop(self):
         A.HA_WEBHOOK_URL = ""
         code, body = self._post({"room": "Kitchen", "present": True})
