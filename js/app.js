@@ -84,6 +84,7 @@ const app = {
   presence: null,
   presentNow: true,
   _lastPresencePostMs: -Infinity,
+  _presenceHeartbeat: null,
   snapshotToken: '',
   reduceMotion: false,
   state: REST,
@@ -254,6 +255,7 @@ function checkNightSchedule(){
 
 // Presence -> brightness. Re-run the dim decision with the new presence input.
 const PRESENCE_POST_MIN_MS = 5000;
+const PRESENCE_HEARTBEAT_MS = 120000;   // re-post current presence every 2 min (keeps server ts fresh)
 function postPresence(present){
   try {
     if (typeof fetch !== 'function') return;
@@ -287,10 +289,14 @@ function startPresence(){
       },
     });
     app.presence.start();
+    if (!app._presenceHeartbeat){
+      app._presenceHeartbeat = setInterval(() => { try { postPresence(app.presentNow); } catch(_){} }, PRESENCE_HEARTBEAT_MS);
+    }
   } catch(_){}
 }
 function stopPresence(){
   try {
+    if (app._presenceHeartbeat){ clearInterval(app._presenceHeartbeat); app._presenceHeartbeat = null; }
     if (app.presence){ app.presence.stop(); app.presence = null; }
     app.presentNow = true; applyPresence(true);
   } catch(_){}
