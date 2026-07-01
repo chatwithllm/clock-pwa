@@ -329,17 +329,22 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   opacity: .82;
 }
 .second-clock[hidden]{ display: none; }
+/* vmin-based (not vw + a low px ceiling): the old clamp(...,4vw,26px) caps
+   hit almost immediately on a 4K/TV-size viewport since 26px was tuned for
+   phones — the badge read as near-illegibly tiny on a large display even
+   though it's "supposed" to be small relative to the hero clock. vmin scales
+   with the whole display instead of pinning to a phone-appropriate ceiling. */
 .second-clock .sc-time{
-  font-size: clamp(16px, 3.4vw, 26px);
+  font-size: clamp(16px, 2.4vmin, 48px);
   font-weight: 600;
   line-height: 1;
   color: var(--sfg, var(--fg, #e6e6e6));   /* own-weather color */
 }
 .second-clock .sc-meta{ display: flex; gap: 6px; align-items: baseline; }
-.second-clock .sc-label{ font-size: 11px; letter-spacing: .08em; opacity: .75; }
-.second-clock .sc-day{ font-size: 11px; opacity: .55; }
+.second-clock .sc-label{ font-size: clamp(9px, 1vmin, 18px); letter-spacing: .08em; opacity: .75; }
+.second-clock .sc-day{ font-size: clamp(9px, 1vmin, 18px); opacity: .55; }
 .second-clock .sc-temp{
-  font-size: 12px;
+  font-size: clamp(10px, 1.1vmin, 20px);
   opacity: .8;
   color: var(--sfg, var(--fg, #e6e6e6));
 }
