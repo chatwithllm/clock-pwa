@@ -761,7 +761,7 @@ function renderAlerts(){
     const view = alertView(app._alerts, app.settings && app.settings.profile);
     const criticals = view.filter(a => a.severity === 'critical');
     const warnings = view.filter(a => a.severity !== 'critical');
-    const overlay = $('alertOverlay'), banner = $('alertBanner');
+    const overlay = $('alertOverlay');
 
     if (overlay){
       if (criticals.length){
@@ -774,15 +774,8 @@ function renderAlerts(){
         overlay.hidden = false;
       } else overlay.hidden = true;
     }
-    if (banner){
-      if (warnings.length){
-        const w = warnings[0];
-        banner.innerHTML = '<span class="alert-bicon">' + alertIcon(w.type) + '</span>'
-          + escHtml((w.title ? w.title + ' — ' : '') + (w.message || '')
-            + (warnings.length > 1 ? ('  (+' + (warnings.length - 1) + ')') : ''));
-        banner.hidden = false;
-      } else banner.hidden = true;
-    }
+    // Warnings no longer get a banner takeover — the alert rail is their
+    // visual home now (see renderAlertRail above); chimes still fire below.
 
     const nowActive = criticals.length > 0;
     // Critical overrides night-dim + re-asserts wake while active.

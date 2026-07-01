@@ -420,15 +420,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .alert-card .alert-message{ font-size:clamp(16px,3.4vmin,34px); margin-top:.4em; opacity:.95; }
 .alert-card .alert-time{ font-size:clamp(11px,1.8vmin,16px); margin-top:.8em; opacity:.7; letter-spacing:.1em; text-transform:uppercase; }
 .alert-card .alert-more{ font-size:clamp(12px,2vmin,18px); margin-top:.8em; opacity:.85; }
-/* Warning banner — amber top strip, non-blocking. */
-.alert-banner{
-  position:fixed; top:0; left:0; right:0; z-index:38;
-  padding:10px 16px; text-align:center;
-  background:rgba(180,120,0,.92); color:#fff; font-weight:600;
-  font-size:clamp(13px,2.2vmin,18px);
-}
-.alert-banner[hidden]{ display:none; }
-
 /* Profile-switch confirmation toast (NFC dock). */
 .profile-toast{
   position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
@@ -444,29 +435,31 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 /* Off-screen capture surface for camera presence — kept out of layout/view. */
 .presence-cam{ position:fixed; width:1px; height:1px; opacity:0; pointer-events:none; left:-9999px; }
 
-/* Typed alert icon (overlay + banner), blinking — calmed under reduced-motion. */
+/* Typed alert icon (critical overlay), blinking — calmed under reduced-motion. */
 .alert-card .alert-icon{ font-size:clamp(40px,12vmin,110px); line-height:1; margin-bottom:.15em; }
-.alert-banner .alert-bicon{ margin-right:.4em; }
 @media (prefers-reduced-motion: no-preference){
-  .alert-card .alert-icon, .alert-banner .alert-bicon{ animation:alertBlink 1s steps(1,end) infinite; }
+  .alert-card .alert-icon{ animation:alertBlink 1s steps(1,end) infinite; }
 }
 @keyframes alertBlink{ 0%,60%{opacity:1} 61%,100%{opacity:.25} }
 
 /* Alert rail — 12 fixed-position slots (6 top edge, 6 bottom edge), one per
-   alert type. Below the warning banner (z-index 38) and critical overlay
-   (40); when either is up the rail is moot anyway since the overlay covers
-   inset:0. A slot with no active alert renders nothing (js/app.js leaves
-   .alert-badge un-toggled) — true blank space, not a dim ghost. Position is
-   fixed regardless of banner/second-clock state, by design: the same slot
-   should always mean the same alert type. */
+   alert type. Below the critical overlay (z-index 40) — when it's up the
+   rail is moot anyway since the overlay covers inset:0. A slot with no
+   active alert renders nothing (js/app.js leaves .alert-badge un-toggled)
+   — true blank space, not a dim ghost. Position is fixed regardless of
+   second-clock state, by design: the same slot should always mean the same
+   alert type. Each row is two 3-slot corner groups (not one row spread
+   evenly with space-between) so slots stay in the side margins instead of
+   drifting over the hero clock's center as its size changes. */
 .alert-rail{
   position:fixed; left:0; right:0; z-index:36;
   display:flex; justify-content:space-between;
-  padding:0 calc(var(--safe-left) + 4px) 0 calc(var(--safe-left) + 4px);
+  padding:0 calc(var(--safe-left) + 4px) 0 calc(var(--safe-right) + 4px);
   pointer-events:none;
 }
-.alert-rail-top{ top:calc(env(safe-area-inset-top,0px) + 60px); }
+.alert-rail-top{ top:calc(env(safe-area-inset-top,0px) + 10px); }
 .alert-rail-bottom{ bottom:calc(env(safe-area-inset-bottom,0px) + 14px); }
+.alert-rail-group{ display:flex; gap:10px; }
 .alert-slot{ width:clamp(56px,11vmin,84px); display:flex; justify-content:center; }
 .alert-badge{
   display:none; /* toggled to flex by js/app.js only when this slot's type is active */
