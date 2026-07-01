@@ -67,6 +67,12 @@
       <span class="sc-temp" id="secondTemp" hidden></span>
     </div>
 
+    <!-- Flashing screen-edge border — pulses for any active alert (amber
+         warning / red critical), on top of everything so it still frames a
+         critical's full-screen overlay too. Purely decorative attention-grab,
+         never blocks input. -->
+    <div class="alert-border" id="alertBorder" aria-hidden="true"></div>
+
     <!-- Critical-alert overlay (red, blocks the screen). Hidden unless a critical is active. -->
     <div class="alert-overlay" id="alertOverlay" hidden role="alertdialog" aria-label="Critical alert">
       <div class="alert-card">
@@ -77,8 +83,39 @@
         <div class="alert-more" id="alertMore"></div>
       </div>
     </div>
-    <!-- Warning banner (amber strip, non-blocking). -->
-    <div class="alert-banner" id="alertBanner" hidden role="status"></div>
+    <!-- Alert rail: 12 fixed-position slots (6 top edge, 6 bottom edge), one
+         per alert type. A slot only renders when its type is active — true
+         blank space otherwise — so the position never shifts and a room
+         learns "top-left = leak" by muscle memory. Each row is two 3-slot
+         corner groups (not one evenly-spread row) so slots stay in the
+         margins beside the clock instead of drifting over its center as
+         the hero clock's width/height changes. Complements (doesn't
+         replace) the critical overlay above, which carries the actual
+         title/message. -->
+    <div class="alert-rail alert-rail-top" id="alertRailTop" aria-hidden="true">
+      <div class="alert-rail-group">
+        <div class="alert-slot" id="railWater_leak" data-type="water_leak"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Leak</span></div></div>
+        <div class="alert-slot" id="railWindow" data-type="window"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Window</span></div></div>
+        <div class="alert-slot" id="railSecurity" data-type="security"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Security</span></div></div>
+      </div>
+      <div class="alert-rail-group">
+        <div class="alert-slot" id="railTemperature" data-type="temperature"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Temp</span></div></div>
+        <div class="alert-slot" id="railMotion" data-type="motion"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Motion</span></div></div>
+        <div class="alert-slot" id="railPower" data-type="power"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Power</span></div></div>
+      </div>
+    </div>
+    <div class="alert-rail alert-rail-bottom" id="alertRailBottom" aria-hidden="true">
+      <div class="alert-rail-group">
+        <div class="alert-slot" id="railDoor" data-type="door"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Door</span></div></div>
+        <div class="alert-slot" id="railSmoke" data-type="smoke"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Smoke</span></div></div>
+        <div class="alert-slot" id="railCo" data-type="co"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">CO</span></div></div>
+      </div>
+      <div class="alert-rail-group">
+        <div class="alert-slot" id="railFreeze" data-type="freeze"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Freeze</span></div></div>
+        <div class="alert-slot" id="railOther" data-type="other"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label">Other</span></div></div>
+        <div class="alert-slot" id="railSpare" data-type="spare"><div class="alert-badge"><span class="alert-slot-icon"></span><span class="alert-slot-label"></span></div></div>
+      </div>
+    </div>
 
     <!-- Brief confirmation when a dock/NFC tap re-roomed this display. -->
     <div class="profile-toast" id="profileToast" hidden role="status"></div>

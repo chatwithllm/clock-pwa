@@ -10,7 +10,7 @@ import { DpadNav } from './nav.js';
 import { WakeKeeper } from './wakelock.js';
 import { WeatherFX } from './weatherfx.js';
 import { weatherColor } from './feelcolor.js';
-import { alertView, alertIcon } from './alertview.js';
+import { alertView, alertIcon, alertRailView, RAIL_TOP, RAIL_BOTTOM } from './alertview.js';
 import { Presence } from './presence.js';
 import { SunArc } from './sunarc.js';
 
@@ -713,6 +713,33 @@ function announceSub(a){
 const ALERT_POLL_MS = 5000;
 const ALERT_RECHIME_MS = 30000;
 
+// type -> alert-rail slot element id (see index.html's alert-rail-top/bottom).
+const RAIL_ID = {
+  water_leak:'railWater_leak', window:'railWindow', security:'railSecurity',
+  temperature:'railTemperature', motion:'railMotion', power:'railPower',
+  door:'railDoor', smoke:'railSmoke', co:'railCo', freeze:'railFreeze',
+  other:'railOther', spare:'railSpare',
+};
+const RAIL_TYPES = [...RAIL_TOP, ...RAIL_BOTTOM];
+
+// Fixed 12-slot rail: each slot renders only when its type has an active
+// alert (see alertRailView) — never touches the critical overlay / banner.
+function renderAlertRail(){
+  try {
+    const rail = alertRailView(app._alerts, app.settings && app.settings.profile);
+    for (const t of RAIL_TYPES){
+      const el = $(RAIL_ID[t]); if (!el) continue;
+      const sev = rail[t];
+      el.classList.toggle('is-critical', sev === 'critical');
+      el.classList.toggle('is-warning', sev === 'warning');
+      if (sev){
+        const icon = el.querySelector('.alert-slot-icon');
+        if (icon) icon.textContent = alertIcon(t);
+      }
+    }
+  } catch(_) { /* never break the clock */ }
+}
+
 async function pollAlerts(){
   if (typeof fetch !== 'function') return;
   try {
@@ -729,11 +756,12 @@ function fmtAlertTime(ts){
 }
 
 function renderAlerts(){
+  renderAlertRail();
   try {
     const view = alertView(app._alerts, app.settings && app.settings.profile);
     const criticals = view.filter(a => a.severity === 'critical');
     const warnings = view.filter(a => a.severity !== 'critical');
-    const overlay = $('alertOverlay'), banner = $('alertBanner');
+    const overlay = $('alertOverlay');
 
     if (overlay){
       if (criticals.length){
@@ -746,14 +774,13 @@ function renderAlerts(){
         overlay.hidden = false;
       } else overlay.hidden = true;
     }
-    if (banner){
-      if (warnings.length){
-        const w = warnings[0];
-        banner.innerHTML = '<span class="alert-bicon">' + alertIcon(w.type) + '</span>'
-          + escHtml((w.title ? w.title + ' — ' : '') + (w.message || '')
-            + (warnings.length > 1 ? ('  (+' + (warnings.length - 1) + ')') : ''));
-        banner.hidden = false;
-      } else banner.hidden = true;
+    // Warnings no longer get a banner takeover — the alert rail is their
+    // visual home now (see renderAlertRail above); chimes still fire below.
+
+    const border = $('alertBorder');
+    if (border){
+      border.classList.toggle('is-critical', criticals.length > 0);
+      border.classList.toggle('is-warning', !criticals.length && warnings.length > 0);
     }
 
     const nowActive = criticals.length > 0;

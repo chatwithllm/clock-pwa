@@ -211,9 +211,9 @@ export class Clock {
     const landscape = availW > availH;
     // Landscape is usually height-bound — let the hero clock claim more height.
     // Night (_hero=1) frees the sun tile, so it goes a touch bigger still.
-    let vFrac = landscape ? (b.dateEl ? 0.74 : 0.86) : (b.dateEl ? 0.66 : 0.8);
+    let vFrac = landscape ? (b.dateEl ? 0.82 : 0.92) : (b.dateEl ? 0.66 : 0.8);
     if (this._hero >= 1) vFrac += 0.06;
-    vFrac = Math.min(vFrac, 0.9);
+    vFrac = Math.min(vFrac, landscape ? 0.95 : 0.9);
     const Hh = availH * vFrac;
     const factor = n*wK + (n-1)*gapK + (ampmK ? (ampmK + gapK) : 0);
     const Hw = availW / factor;
