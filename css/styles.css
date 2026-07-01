@@ -406,6 +406,27 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .row-note{ font-size: 12px; opacity: .6; font-style: italic; }
 .ctrl:disabled{ opacity: .5; cursor: not-allowed; }
 
+/* Flashing screen-edge border — attention-grab for any active alert. Sits
+   above the critical overlay (z-index 40) so it frames that too; never
+   intercepts input. Off by default (no class) — js/app.js toggles
+   is-warning/is-critical off the same poll loop that drives the rail. */
+.alert-border{
+  position:fixed; inset:0; z-index:41; pointer-events:none;
+  opacity:0; transition:opacity .3s ease;
+}
+.alert-border.is-warning{
+  opacity:1; box-shadow:inset 0 0 0 6px #d9883a, inset 0 0 46px 6px rgba(217,136,58,.7);
+  animation:borderFlash 1.8s ease-in-out infinite;
+}
+.alert-border.is-critical{
+  opacity:1; box-shadow:inset 0 0 0 8px #ff5a5f, inset 0 0 60px 10px rgba(255,90,95,.8);
+  animation:borderFlash 1s ease-in-out infinite;
+}
+@keyframes borderFlash{ 0%,100%{opacity:1} 50%{opacity:.35} }
+@media (prefers-reduced-motion: reduce){
+  .alert-border.is-warning, .alert-border.is-critical{ animation:none; opacity:.8; }
+}
+
 /* Critical alert overlay — red, blocks the screen, sits above announcements. */
 .alert-overlay{
   position:fixed; inset:0; z-index:40;

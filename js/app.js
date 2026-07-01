@@ -777,6 +777,12 @@ function renderAlerts(){
     // Warnings no longer get a banner takeover — the alert rail is their
     // visual home now (see renderAlertRail above); chimes still fire below.
 
+    const border = $('alertBorder');
+    if (border){
+      border.classList.toggle('is-critical', criticals.length > 0);
+      border.classList.toggle('is-warning', !criticals.length && warnings.length > 0);
+    }
+
     const nowActive = criticals.length > 0;
     // Critical overrides night-dim + re-asserts wake while active.
     if (nowActive && !app.alertActive){

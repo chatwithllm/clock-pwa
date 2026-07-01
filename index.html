@@ -67,6 +67,12 @@
       <span class="sc-temp" id="secondTemp" hidden></span>
     </div>
 
+    <!-- Flashing screen-edge border — pulses for any active alert (amber
+         warning / red critical), on top of everything so it still frames a
+         critical's full-screen overlay too. Purely decorative attention-grab,
+         never blocks input. -->
+    <div class="alert-border" id="alertBorder" aria-hidden="true"></div>
+
     <!-- Critical-alert overlay (red, blocks the screen). Hidden unless a critical is active. -->
     <div class="alert-overlay" id="alertOverlay" hidden role="alertdialog" aria-label="Critical alert">
       <div class="alert-card">
