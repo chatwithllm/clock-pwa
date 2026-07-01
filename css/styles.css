@@ -104,12 +104,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .app.force-landscape .stage{padding:clamp(2px,1vmin,14px)}
 /* When a second-clock badge is shown, reserve a top strip in landscape so the
    hero clock drops below the fixed top-right badge instead of overlapping it.
-   The badge is a constant-size overlay (bottom edge ~92px), so the reserve is a
-   constant too — independent of viewport height and of whether the date row shows. */
+   The badge is a constant-size overlay (bottom edge ~58px now it's chrome-free),
+   so the reserve is a constant too — independent of viewport height and of
+   whether the date row shows. Kept tight since every px here is stage height
+   the hero clock loses on short landscape viewports. */
 @media (orientation:landscape){
-  .app.has-second .stage{ padding-top:calc(env(safe-area-inset-top,0px) + 96px) }
+  .app.has-second .stage{ padding-top:calc(env(safe-area-inset-top,0px) + 60px) }
 }
-.app.force-landscape.has-second .stage{ padding-top:calc(env(safe-area-inset-top,0px) + 96px) }
+.app.force-landscape.has-second .stage{ padding-top:calc(env(safe-area-inset-top,0px) + 60px) }
 .weather{grid-area:weather;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:flex-start}
 
 /* Landscape: weather lays out as a centered horizontal footer strip.
@@ -205,6 +207,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .analog-svg, .digital-svg{display:block;max-width:100%;max-height:100%}
 .digital-svg{max-width:min(100%,1080px);max-height:min(100%,46vh)}
 .analog-svg{max-width:min(100%,64vmin,560px);max-height:min(100%,64vmin,560px)}
+/* Landscape viewport height is scarce (short phones in landscape), so the vh
+   cap above under-fills the stage row it actually has. Raise it there. */
+@media (orientation:landscape){ .digital-svg{max-height:min(100%,68vh)} }
+.app.force-landscape .digital-svg{max-height:min(100%,68vh)}
 
 /* ---- Flip-clock (split-flap) digital style ---- */
 .flip{display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -245,6 +251,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
    available height so it never overflows the date/weather/chrome on short landscape;
    52vh keeps it from getting absurdly tall on roomy portrait. */
 .block-svg{display:block;width:100%;flex:1 1 auto;min-height:0;max-width:100%;max-height:min(100%,52vh)}
+/* Landscape viewport height is scarce, so 52vh under-fills there — raise it
+   (same reasoning as .digital-svg above). */
+@media (orientation:landscape){ .block-svg{max-height:min(100%,74vh)} }
+.app.force-landscape .block-svg{max-height:min(100%,74vh)}
 .led{transform-box:fill-box;transform-origin:center;
   transition:transform .35s ease,opacity .35s ease,fill .35s ease}
 .led.on{fill:var(--led-on);opacity:1;transform:scale(1);
@@ -303,7 +313,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   .sunarc-core{animation:none}
 }
 
-/* Secondary clock — corner badge, top-right */
+/* Secondary clock — seamless, top-right. No card chrome (same "floats on
+   the black bg" treatment as .wx-card): hierarchy vs. the hero clock reads
+   through smaller scale + dimmed opacity, not a boxed tile. */
 .second-clock{
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 14px);
@@ -312,16 +324,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(4px);
   z-index: 5;
   pointer-events: none;
+  opacity: .82;
 }
 .second-clock[hidden]{ display: none; }
 .second-clock .sc-time{
-  font-size: clamp(18px, 4vw, 30px);
+  font-size: clamp(16px, 3.4vw, 26px);
   font-weight: 600;
   line-height: 1;
   color: var(--sfg, var(--fg, #e6e6e6));   /* own-weather color */
@@ -442,3 +451,52 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   .alert-card .alert-icon, .alert-banner .alert-bicon{ animation:alertBlink 1s steps(1,end) infinite; }
 }
 @keyframes alertBlink{ 0%,60%{opacity:1} 61%,100%{opacity:.25} }
+
+/* Alert rail — 12 fixed-position slots (6 top edge, 6 bottom edge), one per
+   alert type. Below the warning banner (z-index 38) and critical overlay
+   (40); when either is up the rail is moot anyway since the overlay covers
+   inset:0. A slot with no active alert renders nothing (js/app.js leaves
+   .alert-badge un-toggled) — true blank space, not a dim ghost. Position is
+   fixed regardless of banner/second-clock state, by design: the same slot
+   should always mean the same alert type. */
+.alert-rail{
+  position:fixed; left:0; right:0; z-index:36;
+  display:flex; justify-content:space-between;
+  padding:0 calc(var(--safe-left) + 4px) 0 calc(var(--safe-left) + 4px);
+  pointer-events:none;
+}
+.alert-rail-top{ top:calc(env(safe-area-inset-top,0px) + 60px); }
+.alert-rail-bottom{ bottom:calc(env(safe-area-inset-bottom,0px) + 14px); }
+.alert-slot{ width:clamp(56px,11vmin,84px); display:flex; justify-content:center; }
+.alert-badge{
+  display:none; /* toggled to flex by js/app.js only when this slot's type is active */
+  flex-direction:column; align-items:center; gap:6px;
+}
+.alert-slot.is-warning .alert-badge, .alert-slot.is-critical .alert-badge{ display:flex; }
+.alert-slot-icon{
+  width:clamp(40px,9vmin,64px); height:clamp(40px,9vmin,64px); border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:clamp(18px,4vmin,26px); line-height:1;
+}
+.alert-slot-label{ font-size:clamp(9px,1.8vmin,12px); letter-spacing:.05em; color:var(--fg); opacity:.85 }
+.alert-slot.is-warning .alert-slot-icon{
+  background:rgba(217,136,58,.16); border:1px solid rgba(217,136,58,.5);
+  box-shadow:0 0 14px rgba(217,136,58,.35);
+  animation:alertHeartbeat 1.8s ease-in-out infinite;
+}
+.alert-slot.is-critical .alert-slot-icon{
+  background:rgba(255,90,95,.18); border:1px solid rgba(255,90,95,.6);
+  box-shadow:0 0 18px rgba(255,90,95,.45);
+  animation:alertHeartbeat 1s ease-in-out infinite;
+}
+/* lub-dub: two quick beats then a rest, like an actual pulse */
+@keyframes alertHeartbeat{
+  0%,100%{transform:scale(1)}
+  14%{transform:scale(1.16)}
+  28%{transform:scale(1)}
+  42%{transform:scale(1.12)}
+  70%{transform:scale(1)}
+}
+@media (prefers-reduced-motion: reduce){
+  .alert-slot.is-warning .alert-slot-icon, .alert-slot.is-critical .alert-slot-icon{ animation:none; }
+}

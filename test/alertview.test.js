@@ -45,3 +45,52 @@ test('alertIcon: unknown / missing -> warning default', () => {
   assert.equal(alertIcon(undefined), '⚠️');
   assert.equal(alertIcon(null), '⚠️');
 });
+
+import { alertRailView, RAIL_TOP, RAIL_BOTTOM } from '../js/alertview.js';
+
+test('alertRailView: known type -> its own slot at the right severity', () => {
+  const out = alertRailView([A({key:'k1', type:'water_leak', severity:'critical'})], 'None');
+  assert.deepEqual(out, { water_leak: 'critical' });
+});
+
+test('alertRailView: unrecognized type buckets into "other"', () => {
+  const out = alertRailView([A({key:'k1', type:'earthquake', severity:'warning'})], 'None');
+  assert.deepEqual(out, { other: 'warning' });
+});
+
+test('alertRailView: missing type also buckets into "other"', () => {
+  const out = alertRailView([A({key:'k1', severity:'warning'})], 'None');
+  assert.deepEqual(out, { other: 'warning' });
+});
+
+test('alertRailView: same slot takes the worse (critical) severity', () => {
+  const out = alertRailView([
+    A({key:'k1', type:'door', severity:'warning'}),
+    A({key:'k2', type:'door', severity:'critical'}),
+  ], 'None');
+  assert.deepEqual(out, { door: 'critical' });
+});
+
+test('alertRailView: "spare" is never a real type -> falls into "other"', () => {
+  const out = alertRailView([A({key:'k1', type:'spare', severity:'warning'})], 'None');
+  assert.deepEqual(out, { other: 'warning' });
+});
+
+test('alertRailView: respects target/profile filtering', () => {
+  const list = [A({key:'k1', type:'smoke', target:'Kitchen', severity:'critical'})];
+  assert.deepEqual(alertRailView(list, 'Kitchen'), { smoke: 'critical' });
+  assert.deepEqual(alertRailView(list, 'Bedroom'), {});
+});
+
+test('alertRailView: garbage input yields empty object', () => {
+  assert.deepEqual(alertRailView(null, 'x'), {});
+});
+
+test('RAIL_TOP + RAIL_BOTTOM: 6 slots each, cover all 10 known types + other + spare', () => {
+  assert.equal(RAIL_TOP.length, 6);
+  assert.equal(RAIL_BOTTOM.length, 6);
+  const all = [...RAIL_TOP, ...RAIL_BOTTOM];
+  assert.equal(new Set(all).size, 12);
+  assert.ok(all.includes('other'));
+  assert.ok(all.includes('spare'));
+});
