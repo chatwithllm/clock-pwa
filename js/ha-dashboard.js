@@ -35,3 +35,48 @@ export function resolveDashboard(dashboards, profileName) {
   if (!dashboards || !dashboards.profiles || !profileName || profileName === 'None') return null;
   return dashboards.profiles[profileName] || null;
 }
+
+const CLIMATE_STEP = 0.5;
+
+function domainOf(entityId) { return String(entityId || '').split('.')[0]; }
+function isOn(state) { return !!state && state.state === 'on'; }
+function isAvailable(state) { return !!state && state.state !== 'unavailable' && state.state !== 'unknown'; }
+
+export function tileAction(tile, state, dir = 0) {
+  if (!tile) return null;
+  if (tile.type === 'toggle') {
+    return { domain: domainOf(tile.entity), service: 'toggle', service_data: { entity_id: tile.entity } };
+  }
+  if (tile.type === 'scene' || tile.type === 'button') {
+    const svc = tile.service || (tile.type === 'button' ? 'button.press' : 'scene.turn_on');
+    const [domain, service] = svc.split('.');
+    return { domain, service, service_data: { entity_id: tile.target || tile.entity } };
+  }
+  if (tile.type === 'climate') {
+    const base = (state && state.attributes && Number(state.attributes.temperature)) || 0;
+    const temperature = Math.round((base + dir * CLIMATE_STEP) * 10) / 10;
+    return { domain: 'climate', service: 'set_temperature', service_data: { entity_id: tile.entity, temperature } };
+  }
+  return null; // sensor is read-only
+}
+
+export function projectTile(tile, state) {
+  const available = isAvailable(state);
+  const attrs = (state && state.attributes) || {};
+  const base = {
+    type: tile.type,
+    label: tile.label || tile.entity || tile.target || '',
+    icon: tile.icon || '',
+    available,
+    unit: tile.unit || attrs.unit_of_measurement || '',
+    value: available ? String(state.state) : '—',
+    on: isOn(state),
+    current: null,
+    setpoint: null,
+  };
+  if (tile.type === 'climate') {
+    base.current = Number.isFinite(Number(attrs.current_temperature)) ? Number(attrs.current_temperature) : null;
+    base.setpoint = Number.isFinite(Number(attrs.temperature)) ? Number(attrs.temperature) : null;
+  }
+  return base;
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDashboards, resolveDashboard } from '../js/ha-dashboard.js';
+import { validateDashboards, resolveDashboard, tileAction, projectTile } from '../js/ha-dashboard.js';
 
 test('validateDashboards keeps valid tiles, drops malformed ones', () => {
   const out = validateDashboards({
@@ -33,4 +33,47 @@ test('resolveDashboard returns the profile block or null', () => {
   assert.equal(resolveDashboard(d, 'Kitchen').tiles.length, 1);
   assert.equal(resolveDashboard(d, 'Missing'), null);
   assert.equal(resolveDashboard(d, 'None'), null);
+});
+
+test('tileAction: toggle uses the entity domain', () => {
+  assert.deepEqual(
+    tileAction({ type: 'toggle', entity: 'switch.fan' }, { state: 'off' }),
+    { domain: 'switch', service: 'toggle', service_data: { entity_id: 'switch.fan' } });
+});
+
+test('tileAction: scene/button fire their configured service', () => {
+  assert.deepEqual(
+    tileAction({ type: 'scene', service: 'scene.turn_on', target: 'scene.night' }, undefined),
+    { domain: 'scene', service: 'turn_on', service_data: { entity_id: 'scene.night' } });
+});
+
+test('tileAction: climate +/- nudges the setpoint by 0.5', () => {
+  const st = { state: 'heat', attributes: { temperature: 20 } };
+  assert.deepEqual(
+    tileAction({ type: 'climate', entity: 'climate.t' }, st, +1),
+    { domain: 'climate', service: 'set_temperature', service_data: { entity_id: 'climate.t', temperature: 20.5 } });
+});
+
+test('tileAction: sensor is read-only', () => {
+  assert.equal(tileAction({ type: 'sensor', entity: 'sensor.x' }, { state: '5' }), null);
+});
+
+test('projectTile: unavailable when state is missing', () => {
+  const p = projectTile({ type: 'sensor', entity: 'sensor.x', unit: '°C' }, undefined);
+  assert.equal(p.available, false);
+  assert.equal(p.value, '—');
+});
+
+test('projectTile: toggle on-state', () => {
+  const p = projectTile({ type: 'toggle', entity: 'light.x', label: 'Lamp' }, { state: 'on' });
+  assert.equal(p.on, true);
+  assert.equal(p.available, true);
+  assert.equal(p.label, 'Lamp');
+});
+
+test('projectTile: climate exposes current + setpoint', () => {
+  const p = projectTile({ type: 'climate', entity: 'climate.t' },
+    { state: 'heat', attributes: { current_temperature: 19, temperature: 21 } });
+  assert.equal(p.current, 19);
+  assert.equal(p.setpoint, 21);
 });
