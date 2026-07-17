@@ -124,6 +124,16 @@
       <div id="alertList"></div>
       <div class="status" id="alertStatus" aria-live="polite"></div>
     </section>
+
+    <section class="card" id="dashboardsSection" style="margin-top:16px">
+      <h2>Profile dashboards</h2>
+      <label for="dashProfile">Profile</label>
+      <select id="dashProfile"></select>
+      <textarea id="dashJson" rows="16" spellcheck="false"
+        placeholder='[{ "type": "toggle", "entity": "light.guest", "label": "Ceiling", "icon": "💡" }]'></textarea>
+      <div id="dashStatus" class="status" aria-live="polite"></div>
+      <button class="ghost" id="dashSave" type="button">Save dashboard</button>
+    </section>
   </div>
 
   <script>
@@ -277,7 +287,7 @@
     }
 
     function loadProfiles(){
-      fetch('profiles.json?ts=' + Date.now(), { cache:'no-store' }).then(function(r){
+      return fetch('profiles.json?ts=' + Date.now(), { cache:'no-store' }).then(function(r){
         return r.ok ? r.json() : { profiles: [] };
       }).then(function(j){
         customProfiles = (j && Array.isArray(j.profiles)) ? j.profiles.map(function(x){ return String(x).trim(); }).filter(Boolean) : [];
@@ -322,7 +332,53 @@
       }).catch(function(err){ customProfiles.splice(idx, 0, removed); renderProfiles(); rebuildTargets(); setProfStatus('Failed: '+err, false); });
     });
 
-    loadProfiles();
+    var dashboards = { version: 1, profiles: {} };
+
+    function putDashboards(){
+      return fetch('dashboards.json', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(dashboards, null, 2)
+      });
+    }
+    function setDashStatus(msg, ok){ var s=$('dashStatus'); s.textContent=msg; s.className='status '+(ok===true?'ok':ok===false?'err':''); }
+
+    function loadDashboards(){
+      return fetch('dashboards.json?ts=' + Date.now(), { cache:'no-store' }).then(function(r){
+        return r.ok ? r.json() : { version:1, profiles:{} };
+      }).then(function(j){
+        dashboards = (j && typeof j === 'object' && j.profiles) ? j : { version:1, profiles:{} };
+        if (!dashboards.profiles) dashboards.profiles = {};
+      }).catch(function(){ dashboards = { version:1, profiles:{} }; });
+    }
+    function fillDashProfiles(){
+      var sel = $('dashProfile'); sel.innerHTML = '';
+      // Same rooms the profiles editor exposes: built-ins + admin customs.
+      BUILTINS.concat(customProfiles).forEach(function(name){
+        var o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+      });
+      showDashJson();
+    }
+    function showDashJson(){
+      var name = $('dashProfile').value;
+      var block = dashboards.profiles[name];
+      $('dashJson').value = JSON.stringify((block && block.tiles) || [], null, 2);
+    }
+    function saveDashboard(){
+      var name = $('dashProfile').value, tiles;
+      try { tiles = JSON.parse($('dashJson').value); }
+      catch(e){ setDashStatus('Invalid JSON.', false); return; }
+      if (!Array.isArray(tiles)){ setDashStatus('Expected a JSON array of tiles.', false); return; }
+      dashboards.version = 1;
+      dashboards.profiles[name] = { title: name, tiles: tiles };
+      setDashStatus('Saving…');
+      putDashboards().then(function(r){
+        setDashStatus(r.ok ? 'Saved.' : 'Failed (HTTP '+r.status+').', r.ok);
+      }).catch(function(e){ setDashStatus('Failed: '+e, false); });
+    }
+    $('dashProfile').addEventListener('change', showDashJson);
+    $('dashSave').addEventListener('click', saveDashboard);
+
+    Promise.all([loadProfiles(), loadDashboards()]).then(fillDashProfiles);
 
     function setSrcStatus(msg, ok){ var s=$('srcStatus'); s.textContent=msg; s.className='status '+(ok===true?'ok':ok===false?'err':''); }
     function srcMode(){ var r=document.querySelector('input[name=srcMode]:checked'); return r?r.value:'server'; }
