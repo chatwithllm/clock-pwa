@@ -54,6 +54,7 @@
       </span>
       <button class="ctrl" id="btnMode" type="button" data-nav>Analog</button>
       <button class="ctrl" id="btnDim" type="button" data-nav>Dim</button>
+      <button class="ctrl" id="btnDashboard" type="button" data-nav hidden>Dashboard</button>
       <button class="ctrl" id="btnGear" type="button" data-nav aria-haspopup="dialog">Settings</button>
     </nav>
 
@@ -187,6 +188,20 @@
         <span class="row-label">Profile</span>
         <button class="ctrl" id="setProfile" type="button" data-nav>None</button>
       </div>
+      <div class="row row-col">
+        <label class="row-label" for="setHaUrl">Home Assistant URL</label>
+        <input class="city-input" id="setHaUrl" type="url" inputmode="url"
+               placeholder="https://ha.local:8123" data-nav autocomplete="off">
+      </div>
+      <div class="row row-col">
+        <label class="row-label" for="setHaToken">HA long-lived token</label>
+        <div class="city-wrap">
+          <input class="city-input" id="setHaToken" type="password"
+                 placeholder="paste token" data-nav autocomplete="off">
+          <button class="ctrl" id="setHaConnect" type="button" data-nav>Connect</button>
+        </div>
+        <div class="city-status" id="haStatus" aria-live="polite"></div>
+      </div>
       <div class="row">
         <span class="row-label">Source</span>
         <button class="ctrl" id="setSource" type="button" data-nav>Server</button>
@@ -224,6 +239,13 @@
       <button class="ctrl ctrl-primary announce-close" id="announceClose" type="button" data-nav>Dismiss</button>
     </div>
   </div>
+
+  <!-- HA dashboard overlay -->
+  <div id="dashboard" role="dialog" aria-modal="true" aria-label="Home Assistant dashboard">
+    <button class="ctrl ctrl-primary dash-close" id="dashClose" type="button" data-nav>Close</button>
+    <div class="dash-grid" id="dashGrid"></div>
+  </div>
+
   <!-- Stacked announcement toasts (shown when 2+ are live) -->
   <div class="announce-stack" id="announceStack" aria-live="polite" hidden></div>
 
