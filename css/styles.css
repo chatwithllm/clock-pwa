@@ -519,3 +519,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 @media (prefers-reduced-motion: reduce){
   .alert-slot.is-warning .alert-slot-icon, .alert-slot.is-critical .alert-slot-icon{ animation:none; }
 }
+
+/* HA dashboard overlay */
+#dashboard { position: fixed; inset: 0; z-index: 40; display: none; background: rgba(0,0,0,.92);
+  padding: 4vmin; overflow: auto; }
+#dashboard.is-open { display: block; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(30vmin, 1fr));
+  gap: 2vmin; }
+.dash-tile { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1vmin; min-height: 22vmin; border-radius: 2vmin; border: 0; cursor: pointer;
+  background: #1c1c22; color: #eee; font: inherit; padding: 2vmin; text-align: center; white-space: pre-line; }
+.dash-tile.is-on { background: #2f6f3f; }
+.dash-tile.is-unavailable { opacity: .45; }
+.dash-icon { font-size: 6vmin; }
+.dash-close { margin-bottom: 2vmin; }
