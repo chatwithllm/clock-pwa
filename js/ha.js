@@ -36,7 +36,7 @@ export function createHaClient({ url, token, socketFactory, onEntities, onStatus
 
   return {
     callService(action) {
-      if (!ws || state.phase !== 'authed') return;
+      if (stopped || !ws || state.phase !== 'authed') return;
       ws.send(JSON.stringify(callServiceMessage(nextId++, action)));
     },
     close() { stopped = true; if (ws) ws.close(); },

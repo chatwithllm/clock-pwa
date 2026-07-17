@@ -42,3 +42,15 @@ test('callService sends a call_service frame once authed', () => {
   assert.deepEqual({ domain: frame.domain, service: frame.service, service_data: frame.service_data },
     { domain: 'light', service: 'toggle', service_data: { entity_id: 'light.a' } });
 });
+
+test('callService no-ops after close() even if still authed', () => {
+  const client = createHaClient({ url: 'https://ha.local', token: 'T', socketFactory: (u) => new FakeWS(u), onStatus() {}, onEntities() {} });
+  const ws = FakeWS.last;
+  ws.onopen && ws.onopen();
+  ws.emit({ type: 'auth_required' });
+  ws.emit({ type: 'auth_ok' });
+  const sentLengthBeforeClose = ws.sent.length;
+  client.close();
+  client.callService({ domain: 'light', service: 'toggle', service_data: { entity_id: 'light.a' } });
+  assert.equal(ws.sent.length, sentLengthBeforeClose, 'no new frame sent after close()');
+});
