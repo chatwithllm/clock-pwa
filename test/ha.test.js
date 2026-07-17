@@ -56,6 +56,58 @@ test('callService no-ops after close() even if still authed', () => {
   assert.equal(ws.sent.length, sentLengthBeforeClose, 'no new frame sent after close()');
 });
 
+test('onclose schedules a reconnect that opens a new socket; close()/auth_invalid suppress it', () => {
+  const realSetTimeout = globalThis.setTimeout;
+  const calls = [];
+  globalThis.setTimeout = (cb, ms) => { calls.push({ cb, ms }); return calls.length; };
+  try {
+    // Reconnect path: onclose while authed schedules a timer; invoking that
+    // timer's callback opens a fresh FakeWS via the factory.
+    const client = createHaClient({
+      url: 'https://ha.local', token: 'T',
+      socketFactory: (u) => new FakeWS(u),
+      onStatus() {}, onEntities() {},
+    });
+    const ws1 = FakeWS.last;
+    ws1.onopen && ws1.onopen();
+    ws1.emit({ type: 'auth_required' });
+    ws1.emit({ type: 'auth_ok' });
+    assert.equal(calls.length, 0, 'no reconnect scheduled while still connected');
+    ws1.onclose();
+    assert.equal(calls.length, 1, 'onclose while authed schedules a reconnect');
+    const scheduled = calls[0].cb;
+    assert.equal(FakeWS.last, ws1, 'no new socket created until the timer fires');
+    scheduled();
+    assert.notEqual(FakeWS.last, ws1, 'invoking the scheduled callback opens a new socket');
+
+    // close(): onclose after an explicit close() must NOT schedule a reconnect.
+    calls.length = 0;
+    const ws2 = FakeWS.last;
+    ws2.onopen && ws2.onopen();
+    ws2.emit({ type: 'auth_required' });
+    ws2.emit({ type: 'auth_ok' });
+    client.close();
+    ws2.onclose && ws2.onclose();
+    assert.equal(calls.length, 0, 'no reconnect scheduled after close()');
+
+    // auth_invalid: onclose after an auth_invalid message must NOT reconnect.
+    calls.length = 0;
+    const client2 = createHaClient({
+      url: 'https://ha.local', token: 'BAD',
+      socketFactory: (u) => new FakeWS(u),
+      onStatus() {}, onEntities() {},
+    });
+    const ws3 = FakeWS.last;
+    ws3.onopen && ws3.onopen();
+    ws3.emit({ type: 'auth_required' });
+    ws3.emit({ type: 'auth_invalid' });
+    ws3.onclose();
+    assert.equal(calls.length, 0, 'no reconnect scheduled after auth_invalid');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
 test('http:// URL converts to ws://', () => {
   const client = createHaClient({ url: 'http://ha.local', token: 'T', socketFactory: (u) => new FakeWS(u), onStatus() {}, onEntities() {} });
   const ws = FakeWS.last;

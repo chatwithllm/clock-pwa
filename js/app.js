@@ -115,6 +115,7 @@ function setState(next){
     chrome.classList.remove('is-visible');
     panel.classList.remove('is-open');
     panel.setAttribute('aria-hidden','true');
+    closeDashboard();
     clearIdle();
     app.nav.setScope(document);
   } else if (next === ACTIVE){
@@ -978,8 +979,16 @@ function renderActiveDashboard(){
   });
 }
 
-function openDashboard(){ renderActiveDashboard(); $('dashboard').classList.add('is-open'); }
-function closeDashboard(){ $('dashboard').classList.remove('is-open'); }
+function openDashboard(){
+  renderActiveDashboard();
+  $('dashboard').classList.add('is-open');
+  app.nav.setScope($('dashboard'));
+  app.nav.focusFirst();
+}
+function closeDashboard(){
+  $('dashboard').classList.remove('is-open');
+  app.nav.setScope(document);
+}
 
 // Dismiss the currently-centered announcement: remember its id, then re-render
 // (promotes the next-newest live entry into the center, or hides if none left).
@@ -1138,6 +1147,7 @@ function wireInput(){
   app.nav = new DpadNav({
     onEscape: () => {
       if ($('announce') && !$('announce').hidden){ dismissAnnounce(); return; }
+      if ($('dashboard') && $('dashboard').classList.contains('is-open')){ closeDashboard(); return; }
       if (app.state === PANEL) setState(ACTIVE);
     },
     onActivate: () => { if (app.state === ACTIVE) resetIdle(); },
