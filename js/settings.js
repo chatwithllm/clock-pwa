@@ -37,6 +37,8 @@ const DEFAULTS = {
   lat: null,            // CUSTOM location (set via ZIP/city/geolocation/URL)
   lon: null,
   city: null,
+  haUrl: '',            // per-device Home Assistant base URL (e.g. https://ha.local:8123)
+  haToken: '',          // per-device HA long-lived access token (kept local; never sent to /data)
 };
 
 function safeLSGet(key){
@@ -129,6 +131,7 @@ export function saveSettings(s){
     presence: s.presence, saveSnapshots: s.saveSnapshots,
     sourceUserSet: s.sourceUserSet,
     lat: s.lat, lon: s.lon, city: s.city,
+    haUrl: s.haUrl, haToken: s.haToken,
   };
   safeLSSet(LS_KEY, JSON.stringify(out));
 }
