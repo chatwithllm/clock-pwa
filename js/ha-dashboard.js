@@ -61,7 +61,7 @@ export function tileAction(tile, state, dir = 0) {
 }
 
 export function projectTile(tile, state) {
-  const available = isAvailable(state);
+  const available = tile.entity ? isAvailable(state) : true;
   const attrs = (state && state.attributes) || {};
   const base = {
     type: tile.type,
@@ -69,7 +69,7 @@ export function projectTile(tile, state) {
     icon: tile.icon || '',
     available,
     unit: tile.unit || attrs.unit_of_measurement || '',
-    value: available ? String(state.state) : '—',
+    value: available && state ? String(state.state) : '—',
     on: isOn(state),
     current: null,
     setpoint: null,

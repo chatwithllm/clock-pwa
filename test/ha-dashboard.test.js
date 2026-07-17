@@ -77,3 +77,8 @@ test('projectTile: climate exposes current + setpoint', () => {
   assert.equal(p.current, 19);
   assert.equal(p.setpoint, 21);
 });
+
+test('projectTile: stateless scene/button tile is available', () => {
+  const p = projectTile({ type: 'scene', service: 'scene.turn_on', target: 'scene.night', label: 'Night' }, undefined);
+  assert.equal(p.available, true);
+});
