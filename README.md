@@ -275,6 +275,15 @@ profile and enter a JSON array of tiles:
 - `toggle` — `{ "type": "toggle", "entity": "light.guest", "label": "Ceiling", "icon": "💡" }`
 - `scene`/`button` — `{ "type": "scene", "service": "scene.turn_on", "target": "scene.night", "label": "Night" }`
 - `climate` — `{ "type": "climate", "entity": "climate.guest", "label": "Heat" }` (tap left/right to nudge the setpoint)
+- `status` — read-only; maps a numeric sensor value to a status label via
+  thresholds (the tile that exceeds the highest matching `above` wins, else
+  `default`):
+  ```json
+  { "type": "status", "entity": "sensor.dishwasher_power", "label": "Dishwasher", "unit": "W",
+    "thresholds": [ { "above": 10, "text": "Running", "icon": "🟢" } ],
+    "default": { "text": "Idle", "icon": "⚪" } }
+  ```
+  Useful for power → Running/Idle, CO₂ → Good/Elevated/High, etc.
 
 The **Dashboard** button appears on a display only when HA is connected and the
 device's active Profile has a dashboard defined.
