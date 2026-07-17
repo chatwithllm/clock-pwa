@@ -53,8 +53,9 @@ export function tileAction(tile, state, dir = 0) {
     return { domain, service, service_data: { entity_id: tile.target || tile.entity } };
   }
   if (tile.type === 'climate') {
-    const base = (state && state.attributes && Number(state.attributes.temperature)) || 0;
-    const temperature = Math.round((base + dir * CLIMATE_STEP) * 10) / 10;
+    const cur = state && state.attributes ? Number(state.attributes.temperature) : NaN;
+    if (!Number.isFinite(cur)) return null;
+    const temperature = Math.round((cur + dir * CLIMATE_STEP) * 10) / 10;
     return { domain: 'climate', service: 'set_temperature', service_data: { entity_id: tile.entity, temperature } };
   }
   return null; // sensor is read-only

@@ -82,3 +82,7 @@ test('projectTile: stateless scene/button tile is available', () => {
   const p = projectTile({ type: 'scene', service: 'scene.turn_on', target: 'scene.night', label: 'Night' }, undefined);
   assert.equal(p.available, true);
 });
+
+test('tileAction: climate with no setpoint attribute is a no-op', () => {
+  assert.equal(tileAction({ type: 'climate', entity: 'climate.t' }, { state: 'off', attributes: {} }, +1), null);
+});
