@@ -254,6 +254,44 @@ template:
         state: "{{ is_state('input_boolean.room_kitchen_occupied', 'on') }}"
 ```
 
+### Home Assistant dashboards (per profile)
+
+Each display can show a native control dashboard for its room, backed by your
+Home Assistant instance.
+
+**On the display (per device):** open Settings → enter your **Home Assistant
+URL** (e.g. `https://ha.local:8123`) and a **long-lived access token**
+(HA → your profile → Security → Long-lived access tokens → Create). Tap
+**Connect**. The token is stored only on that device and never uploaded.
+
+> Create a **dedicated Home Assistant user** for displays and generate the token
+> as that user — a long-lived token inherits its user's permissions, so this
+> scopes the display's blast radius.
+
+**Define a dashboard (admin):** in `admin.html` → *Profile dashboards*, pick a
+profile and enter a JSON array of tiles:
+
+- `sensor` — `{ "type": "sensor", "entity": "sensor.guest_temp", "unit": "°C" }`
+- `toggle` — `{ "type": "toggle", "entity": "light.guest", "label": "Ceiling", "icon": "💡" }`
+- `scene`/`button` — `{ "type": "scene", "service": "scene.turn_on", "target": "scene.night", "label": "Night" }`
+- `climate` — `{ "type": "climate", "entity": "climate.guest", "label": "Heat" }` (tap left/right to nudge the setpoint)
+
+The **Dashboard** button appears on a display only when HA is connected and the
+device's active Profile has a dashboard defined.
+
+**Home Assistant configuration (required):**
+
+- **CORS** — add the clock's origin to `http.cors_allowed_origins` in HA's
+  `configuration.yaml`:
+  ```yaml
+  http:
+    cors_allowed_origins:
+      - https://clock.example.com
+  ```
+- **HTTPS/WSS** — if the clock is served over HTTPS, HA must be reachable over
+  HTTPS (`wss://…/api/websocket`) or the browser blocks the connection
+  (mixed content).
+
 ### Custom profiles
 
 Built-in room profiles (Theater Room, Kitchen, …) cover most setups. To add
