@@ -5,7 +5,7 @@ const MAX_BACKOFF = 30000;
 
 export function createHaClient({ url, token, socketFactory, onEntities, onStatus }) {
   const mkSocket = socketFactory || ((u) => new WebSocket(u));
-  const wsUrl = String(url).replace(/\/+$/, '') + '/api/websocket';
+  const wsUrl = String(url).trim().replace(/\/+$/, '').replace(/^http/i, 'ws') + '/api/websocket';
   let state = initHaState(token);
   let ws = null;
   let backoff = 1000;

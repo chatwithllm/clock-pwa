@@ -20,6 +20,7 @@ test('client authenticates then reports authed + entities', () => {
   });
   const ws = FakeWS.last;
   assert.match(ws.url, /\/api\/websocket$/);
+  assert.ok(ws.url.startsWith('wss://'), 'https:// must convert to wss://: ' + ws.url);
   ws.onopen && ws.onopen();
   ws.emit({ type: 'auth_required' });
   assert.deepEqual(ws.sent[0], { type: 'auth', access_token: 'T' });
@@ -53,4 +54,11 @@ test('callService no-ops after close() even if still authed', () => {
   client.close();
   client.callService({ domain: 'light', service: 'toggle', service_data: { entity_id: 'light.a' } });
   assert.equal(ws.sent.length, sentLengthBeforeClose, 'no new frame sent after close()');
+});
+
+test('http:// URL converts to ws://', () => {
+  const client = createHaClient({ url: 'http://ha.local', token: 'T', socketFactory: (u) => new FakeWS(u), onStatus() {}, onEntities() {} });
+  const ws = FakeWS.last;
+  assert.ok(ws.url.startsWith('ws://'), 'http:// must convert to ws://: ' + ws.url);
+  assert.ok(!ws.url.startsWith('wss://'), 'http:// must not convert to wss://');
 });
