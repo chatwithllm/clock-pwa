@@ -1,6 +1,23 @@
 // js/ha-dashboard.js — pure dashboard logic (no DOM, no sockets).
 
-const TILE_TYPES = new Set(['sensor', 'toggle', 'scene', 'button', 'climate']);
+const TILE_TYPES = new Set(['sensor', 'toggle', 'scene', 'button', 'climate', 'status']);
+
+function validThreshold(th) {
+  if (!th || typeof th !== 'object') return null;
+  if (typeof th.above !== 'number' || !Number.isFinite(th.above)) return null;
+  if (typeof th.text !== 'string' || !th.text) return null;
+  const out = { above: th.above, text: th.text };
+  if (typeof th.icon === 'string' && th.icon) out.icon = th.icon;
+  return out;
+}
+
+function validDefault(d) {
+  if (!d || typeof d !== 'object') return null;
+  const out = {};
+  if (typeof d.text === 'string' && d.text) out.text = d.text;
+  if (typeof d.icon === 'string' && d.icon) out.icon = d.icon;
+  return Object.keys(out).length ? out : null;
+}
 
 function validTile(t) {
   if (!t || typeof t !== 'object' || !TILE_TYPES.has(t.type)) return null;
@@ -11,8 +28,16 @@ function validTile(t) {
   if (typeof t.label === 'string') tile.label = t.label;
   if (typeof t.icon === 'string') tile.icon = t.icon;
   if (typeof t.unit === 'string') tile.unit = t.unit;
+  if (t.type === 'status') {
+    if (Array.isArray(t.thresholds)) {
+      const thresholds = t.thresholds.map(validThreshold).filter(Boolean);
+      if (thresholds.length) tile.thresholds = thresholds;
+    }
+    const def = validDefault(t.default);
+    if (def) tile.default = def;
+  }
   // Type-specific required bindings.
-  if ((t.type === 'sensor' || t.type === 'toggle' || t.type === 'climate') && !tile.entity) return null;
+  if ((t.type === 'sensor' || t.type === 'toggle' || t.type === 'climate' || t.type === 'status') && !tile.entity) return null;
   if ((t.type === 'scene' || t.type === 'button') && !(tile.service && tile.target) && !tile.entity) return null;
   return tile;
 }
@@ -58,7 +83,20 @@ export function tileAction(tile, state, dir = 0) {
     const temperature = Math.round((cur + dir * CLIMATE_STEP) * 10) / 10;
     return { domain: 'climate', service: 'set_temperature', service_data: { entity_id: tile.entity, temperature } };
   }
-  return null; // sensor is read-only
+  return null; // sensor / status are read-only
+}
+
+function matchStatusBand(tile, available, state) {
+  const numeric = available && state ? Number(state.state) : NaN;
+  const thresholds = Array.isArray(tile.thresholds) ? tile.thresholds : [];
+  let best = null;
+  if (Number.isFinite(numeric)) {
+    for (const th of thresholds) {
+      if (numeric >= th.above && (!best || th.above > best.above)) best = th;
+    }
+  }
+  if (best) return best;
+  return tile.default || {};
 }
 
 export function projectTile(tile, state) {
@@ -78,6 +116,11 @@ export function projectTile(tile, state) {
   if (tile.type === 'climate') {
     base.current = Number.isFinite(Number(attrs.current_temperature)) ? Number(attrs.current_temperature) : null;
     base.setpoint = Number.isFinite(Number(attrs.temperature)) ? Number(attrs.temperature) : null;
+  }
+  if (tile.type === 'status') {
+    const band = matchStatusBand(tile, available, state);
+    base.statusText = band.text || '';
+    base.statusIcon = band.icon || '';
   }
   return base;
 }

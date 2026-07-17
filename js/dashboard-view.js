@@ -16,6 +16,11 @@ function tileText(p) {
   }
   if (p.type === 'toggle') return `${p.label}\n${p.available ? (p.on ? 'On' : 'Off') : '—'}`;
   if (p.type === 'sensor') return `${p.label}\n${p.value}${p.unit || ''}`;
+  if (p.type === 'status') {
+    if (!p.available) return `${p.label}\n—`;
+    const raw = p.unit ? `${p.value} ${p.unit}` : p.value;
+    return `${p.label}\n${p.statusText}${raw ? ' · ' + raw : ''}`;
+  }
   return p.label; // scene / button
 }
 
@@ -29,7 +34,8 @@ export function renderDashboard(container, dashboard, entities, onTileTap) {
     el.type = 'button';
     el.className = tileClassList(p).join(' ');
     el.setAttribute('data-nav', '');
-    if (p.icon) { const i = document.createElement('span'); i.className = 'dash-icon'; i.textContent = p.icon; el.appendChild(i); }
+    const displayIcon = p.type === 'status' ? (p.statusIcon || p.icon) : p.icon;
+    if (displayIcon) { const i = document.createElement('span'); i.className = 'dash-icon'; i.textContent = displayIcon; el.appendChild(i); }
     const label = document.createElement('span');
     label.className = 'dash-text';
     label.textContent = tileText(p);
@@ -39,7 +45,7 @@ export function renderDashboard(container, dashboard, entities, onTileTap) {
         const rect = el.getBoundingClientRect();
         onTileTap(tile, ev.clientX < rect.left + rect.width / 2 ? -1 : +1);
       });
-    } else if (tile.type !== 'sensor') {
+    } else if (tile.type !== 'sensor' && tile.type !== 'status') {
       el.addEventListener('click', () => onTileTap(tile, 0));
     }
     container.appendChild(el);
