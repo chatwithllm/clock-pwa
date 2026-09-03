@@ -1,0 +1,18 @@
+# Overlay used by test/integration/docker-logging.sh.
+#
+# It deliberately changes ONLY the things that would collide with a real
+# deployment (container names, published port). The logging: blocks, the
+# clockdata volume and everything else come from the real docker-compose.yml,
+# so the test asserts against the file that actually ships.
+services:
+  clock:
+    container_name: clock-pwa-logtest
+    ports: !override
+      - "18080:80"
+    environment:
+      ADMIN_USER: "admin"
+      ADMIN_PASS: "logtest-pass"
+      WEATHER_FETCH: "off"
+
+  alert-sidecar:
+    container_name: clock-alert-sidecar-logtest

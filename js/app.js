@@ -1295,7 +1295,13 @@ async function boot(){
   app._soundedIds = new Set();
   try {
     pollAnnounce(); pollProfiles(); pollSource(); pollDashboards();
-    app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); }, ANNOUNCE_POLL_MS);
+    // Noncritical polling pauses while the tab is hidden; the visibilitychange
+    // handler below refreshes immediately on return. Critical alerts (below)
+    // deliberately keep their 5s cadence and are NOT gated on visibility.
+    app.announceTimer = setInterval(() => {
+      if (document.hidden) return;
+      pollAnnounce(); pollProfiles(); pollSource(); pollDashboards();
+    }, ANNOUNCE_POLL_MS);
     document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); } });
   } catch(_){}
 

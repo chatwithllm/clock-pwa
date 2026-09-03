@@ -520,16 +520,43 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   .alert-slot.is-warning .alert-slot-icon, .alert-slot.is-critical .alert-slot-icon{ animation:none; }
 }
 
-/* HA dashboard overlay */
-#dashboard { position: fixed; inset: 0; z-index: 40; display: none; background: rgba(0,0,0,.92);
-  padding: 4vmin; overflow: auto; }
-#dashboard.is-open { display: block; }
-.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(30vmin, 1fr));
-  gap: 2vmin; }
-.dash-tile { display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1vmin; min-height: 22vmin; border-radius: 2vmin; border: 0; cursor: pointer;
-  background: #1c1c22; color: #eee; font: inherit; padding: 2vmin; text-align: center; white-space: pre-line; }
-.dash-tile.is-on { background: #2f6f3f; }
-.dash-tile.is-unavailable { opacity: .45; }
-.dash-icon { font-size: 6vmin; }
-.dash-close { margin-bottom: 2vmin; }
+/* HA dashboard overlay — room control panel */
+#dashboard { position: fixed; inset: 0; z-index: 60; display: none;
+  background: #0F1216; color: #E8EAED; overflow: hidden;
+  padding: max(2.4vmin, env(safe-area-inset-top)) max(3vmin, env(safe-area-inset-right))
+           max(3vmin, env(safe-area-inset-bottom)) max(3vmin, env(safe-area-inset-left));
+  flex-direction: column; gap: 1.6vmin; font-variant-numeric: tabular-nums; }
+#dashboard.is-open { display: flex; }
+/* Close floats top-right (over the notch-safe corner) so the grid gets the full height. */
+.dash-close { position: absolute; z-index: 1;
+  top: max(2vmin, env(safe-area-inset-top)); right: max(2vmin, env(safe-area-inset-right)); margin: 0; }
+#dashGrid { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1.6vmin; }
+.dash-head { flex: 0 0 auto; }
+.dash-title { font-size: 3.2vmin; font-weight: 600; letter-spacing: .04em; }
+/* Thin readout bar: all sensors condensed to one line of divided chips. */
+.dash-statusbar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: stretch; gap: 0;
+  background: #12161B; border: 1px solid #202730; border-radius: 1.4vmin; padding: 1.2vmin 0.6vmin; }
+.stat { display: flex; flex-direction: column; gap: .2vmin; justify-content: center;
+  padding: 0 1.6vmin; min-width: 7vmin; border-right: 1px solid #202730; }
+.stat:last-child { border-right: 0; }
+.stat .s-val { font-size: 2.5vmin; font-weight: 600; line-height: 1.15; white-space: nowrap; }
+.stat .s-lab { font-size: 1.25vmin; text-transform: uppercase; letter-spacing: .12em; color: #7C848D; white-space: nowrap; }
+.stat.is-on .s-val { color: #7ED08F; }
+.stat.is-unavailable { opacity: .4; }
+
+/* Controls — the main event: large tappable tiles that fill the remaining height. */
+.dash-controls { flex: 1 1 auto; min-height: 0; display: grid; gap: 1.6vmin;
+  grid-template-columns: repeat(auto-fit, minmax(min(30vw, 100%), 1fr)); grid-auto-rows: 1fr; }
+.dash-cell { display: flex; flex-direction: column; justify-content: center; gap: .8vmin;
+  border-radius: 1.8vmin; background: #171B21; border: 1px solid #242A31;
+  padding: 2vmin; color: inherit; font: inherit; }
+.control { align-items: center; text-align: center; min-height: 0; cursor: pointer;
+  transition: background .12s ease, box-shadow .12s ease, border-color .12s ease; }
+.control .c-icon { font-size: 5.5vmin; line-height: 1; }
+.control .c-label { font-size: 2.4vmin; font-weight: 600; }
+.control .c-state { font-size: 1.9vmin; color: #7C848D; }
+.control.is-on { background: #E7A94A; border-color: #E7A94A; color: #201400;
+  box-shadow: 0 0 6vmin -1vmin rgba(231,169,74,.85); }
+.control.is-on .c-state { color: #4A3400; }
+.dash-cell.is-unavailable { opacity: .4; }
+@media (prefers-reduced-motion: reduce){ .control { transition: none; } }

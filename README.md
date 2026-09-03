@@ -414,6 +414,42 @@ photo of whoever walks up. Both are **opt-in and off by default**, and need
   30 days / 1000 per room (`SNAPSHOT_RETENTION_DAYS`, `SNAPSHOT_MAX_PER_ROOM`),
   1 MiB per-image cap (`SNAPSHOT_MAX_BYTES`).
 
+### Logs and admin-state persistence
+
+**Logs are bounded.** Both services set `logging: json-file` with
+`max-size: "10m"` / `max-file: "3"`, so each container keeps at most ~30 MiB and
+Docker deletes old segments itself. Before this, one continuously-open kiosk
+(~28 access-log lines/minute) grew the clock log to **674 MB in 14 days**.
+
+**nginx logs conditionally, not blindly.** `nginx.conf` uses a `map` chain to
+drop *only* successful `GET`s of the four hot polling paths — `/alerts.json`,
+`/announce.json`, `/profiles.json`, `/source.json`. The match is on `$uri`
+(query string already stripped), so `?ts=…` cannot defeat it. Still logged:
+every non-2xx (404 / 401 / 429 / 5xx), every `PUT`/`DELETE`, every other route,
+and nginx errors at `warn` and above. There is no `access_log off` anywhere.
+
+**`/data` is a named volume (`clockdata`).** It holds all admin state —
+`announce.json`, `profiles.json`, `source.json`, `dashboards.json`, `uploads/`.
+It used to live in the container's writable layer, so every
+`docker compose up -d --build` silently discarded announcements, custom
+profiles, the source selection and dashboards.
+
+> **One-time migration for an existing deployment.** Adding the volume to a
+> container that already has state does *not* copy that state in — back it up
+> and restore it, or you lose it. See *Updating a deployed container* below.
+
+Missing files are seeded on start by `docker-entrypoint.d/05-data-init.sh`
+(`[]`, `{"profiles":[]}`, `{}`, `{"version":1,"profiles":{}}`). It **never**
+overwrites an existing non-empty file. This is what stopped the continuous
+`/source.json` 404 stream.
+
+Run the integration test for all of the above (needs Docker):
+
+```bash
+npm test               # unit tests
+npm run test:integration
+```
+
 ### Updating a deployed container
 
 The image is built from source (no published registry image), so update = pull + rebuild on the
@@ -438,7 +474,44 @@ Verify it landed:
 docker compose ps                 # container Up, recreated
 git log --oneline -1              # matches GitHub HEAD
 curl -s localhost:8080/config.json
+# logging is per-container and only applies after recreation — check the real thing:
+docker inspect -f '{{.HostConfig.LogConfig}}' clock-pwa clock-alert-sidecar
 ```
+
+#### One-time migration: moving `/data` onto the `clockdata` volume
+
+Only needed the first time you deploy the `clockdata` volume onto a container
+that already holds admin state. **Do this before recreating the container** —
+a fresh named volume is seeded from the *image*, not from the old container.
+
+```bash
+cd clock-pwa
+
+# 1. Back up the live /data out of the running container.
+docker cp clock-pwa:/data ./data-backup-$(date +%F)
+tar czf data-backup-$(date +%F).tgz -C . data-backup-$(date +%F)
+
+# 2. Pull + recreate (creates the empty clockdata volume).
+git pull
+docker compose up -d --build
+
+# 3. Restore the operator state into the volume, then restart.
+docker cp ./data-backup-$(date +%F)/. clock-pwa:/data
+docker exec clock-pwa chown -R nginx:nginx /data
+docker compose restart clock
+
+# 4. Verify nothing was lost.
+curl -s localhost:8080/announce.json
+curl -s localhost:8080/profiles.json
+curl -s localhost:8080/dashboards.json
+curl -s localhost:8080/source.json      # {} on a fresh install, never a 404
+```
+
+**Rollback.** Drop the `clockdata:/data` line (and the `clockdata:` entry under
+`volumes:`) from `docker-compose.yml`, `docker compose up -d --force-recreate
+clock`, then `docker cp ./data-backup-<date>/. clock-pwa:/data` and restart.
+The tarball from step 1 is the authoritative copy either way; keep it until
+you have verified step 4.
 
 Notes:
 - **Keep your location out of the tracked compose file** so `git pull` never conflicts. Put your

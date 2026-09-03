@@ -1,1 +1,32 @@
-{ "version": 1, "profiles": {} }
+{
+  "version": 1,
+  "profiles": {
+    "Kitchen": {
+      "title": "Kitchen",
+      "tiles": [
+        { "type": "sensor", "entity": "binary_sensor.apollo_msr_2_174b84_radar_zone_1_occupancy", "label": "Zone 1", "icon": "🚶" },
+        { "type": "sensor", "entity": "binary_sensor.apollo_msr_2_174b84_radar_zone_2_occupancy", "label": "Zone 2", "icon": "🚶" },
+        { "type": "sensor", "entity": "binary_sensor.apollo_msr_2_174b84_radar_zone_3_occupancy", "label": "Zone 3", "icon": "🚶" },
+
+        { "type": "sensor", "entity": "sensor.ble_temperature_kitchen", "label": "Temp", "icon": "🌡️" },
+        { "type": "status", "entity": "sensor.apollo_msr_2_174b84_co2", "label": "CO₂", "unit": "ppm",
+          "thresholds": [ { "above": 1200, "text": "High", "icon": "🔴" }, { "above": 800, "text": "Elevated", "icon": "🟡" } ],
+          "default": { "text": "Good", "icon": "🟢" } },
+        { "type": "sensor", "entity": "sensor.apollo_msr_2_174b84_ltr390_light", "label": "Light", "icon": "💡" },
+        { "type": "sensor", "entity": "sensor.apollo_msr_2_174b84_ltr390_uv_index", "label": "UV", "icon": "☀️" },
+        { "type": "sensor", "entity": "sensor.apollo_msr_2_174b84_dps310_pressure", "label": "Pressure", "icon": "📊" },
+
+        { "type": "toggle", "entity": "switch.kitchen_lights", "label": "Kitchen", "icon": "💡" },
+        { "type": "toggle", "entity": "light.kitchen_led", "label": "LED", "icon": "💡" },
+        { "type": "toggle", "entity": "light.pantry_light_relay", "label": "Pantry", "icon": "💡" },
+        { "type": "toggle", "entity": "switch.dining_table_light", "label": "Dining", "icon": "💡" },
+        { "type": "toggle", "entity": "input_boolean.kitchen_automation", "label": "Automation", "icon": "⚙️" },
+        { "type": "toggle", "entity": "light.apollo_msr_2_174b84_rgb_light", "label": "Radar RGB", "icon": "🌈" },
+
+        { "type": "status", "entity": "sensor.sonoff_s31_two_energy_power", "label": "Dishwasher", "unit": "W",
+          "thresholds": [ { "above": 10, "text": "Running", "icon": "🟢" } ],
+          "default": { "text": "Idle", "icon": "⚪" } }
+      ]
+    }
+  }
+}
