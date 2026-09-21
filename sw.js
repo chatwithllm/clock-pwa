@@ -1,8 +1,8 @@
 // sw.js — cache-first app shell; network-first w/ cache fallback for Open-Meteo.
 // Registers only over HTTPS/localhost (browsers block SW on plain-http LAN IPs).
 
-const SHELL = 'clockpwa-shell-v26';
-const RUNTIME = 'clockpwa-runtime-v26';
+const SHELL = 'clockpwa-shell-v27';
+const RUNTIME = 'clockpwa-runtime-v27';
 
 const SHELL_FILES = [
   './',
@@ -40,11 +40,21 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.filter((k) => k !== SHELL && k !== RUNTIME).map((k) => caches.delete(k))
-    )).then(()=>self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    const stale = keys.filter((k) => k !== SHELL && k !== RUNTIME);
+    // Old clockpwa caches present => this is an upgrade, not a first install.
+    const upgraded = stale.some((k) => k.startsWith('clockpwa-'));
+    await Promise.all(stale.map((k) => caches.delete(k)));
+    await self.clients.claim();
+    if (upgraded){
+      // An open page keeps running the JS it already loaded, so an always-on
+      // display would show the old build until someone reloads it. Reload the
+      // windows this worker controls now that the new shell is in place.
+      const wins = await self.clients.matchAll({ type: 'window' });
+      wins.forEach((c) => { try { c.navigate(c.url); } catch (_) {} });
+    }
+  })());
 });
 
 self.addEventListener('fetch', (e) => {
