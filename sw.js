@@ -21,6 +21,7 @@ const SHELL_FILES = [
   './js/source.js',
   './js/alertview.js',
   './js/calendar-banner.js',
+  './js/appversion.js',
   './js/presence.js',
   './js/ha.js',
   './js/ha-protocol.js',
@@ -56,6 +57,7 @@ self.addEventListener('fetch', (e) => {
       || url.pathname === '/announce.json' || url.pathname === '/profiles.json'
       || url.pathname === '/source.json' || url.pathname === '/alerts.json'
       || url.pathname === '/dashboards.json'
+      || url.pathname === '/version.json'
       || url.hostname.endsWith('zippopotam.us')){
     e.respondWith(
       fetch(req).then((res) => {

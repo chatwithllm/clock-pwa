@@ -17,6 +17,7 @@ import { createHaClient } from './ha.js';
 import { validateDashboards, resolveDashboard, tileAction } from './ha-dashboard.js';
 import { renderDashboard } from './dashboard-view.js';
 import { calendarBannerView } from './calendar-banner.js';
+import { parseVersion, versionChanged, reloadDelayMs } from './appversion.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -1031,6 +1032,31 @@ function seedMatrixCalendarMock(){
   } catch(_){}
 }
 
+// Server-driven refresh: /version.json is stamped at container start. The first
+// poll records the baseline; a later change means the server was redeployed, so
+// reload (jittered, and only while the display is idle) to pick up the new code.
+async function pollAppVersion(){
+  try {
+    const r = await fetch('version.json?ts=' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return;
+    const v = parseVersion(await r.json());
+    if (!v) return;
+    if (!app._appVersion){ app._appVersion = v; return; }
+    if (versionChanged(app._appVersion, v)) scheduleAppReload();
+  } catch(_) { /* offline or no version.json — keep running */ }
+}
+
+function scheduleAppReload(){
+  if (app._reloadPending) return;
+  app._reloadPending = true;
+  const attempt = () => {
+    // Never yank the screen from someone mid-interaction; retry shortly.
+    if (app.state !== REST){ setTimeout(attempt, 10000); return; }
+    location.reload();
+  };
+  setTimeout(attempt, reloadDelayMs(Math.random()));
+}
+
 // (Re)connect the HA client from the current per-device settings.
 function connectHA(){
   try { if (app._ha) { app._ha.close(); app._ha = null; } } catch(_){}
@@ -1396,15 +1422,15 @@ async function boot(){
   app._announceQueue = [];
   app._soundedIds = new Set();
   try {
-    pollAnnounce(); pollProfiles(); pollSource(); pollDashboards();
+    pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); pollAppVersion();
     // Noncritical polling pauses while the tab is hidden; the visibilitychange
     // handler below refreshes immediately on return. Critical alerts (below)
     // deliberately keep their 5s cadence and are NOT gated on visibility.
     app.announceTimer = setInterval(() => {
       if (document.hidden) return;
-      pollAnnounce(); pollProfiles(); pollSource(); pollDashboards();
+      pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); pollAppVersion();
     }, ANNOUNCE_POLL_MS);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); } });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); pollAppVersion(); } });
   } catch(_){}
 
   // Home Assistant dashboards: restore cached tiles, then connect the client.

@@ -123,6 +123,17 @@ advance the cache version so installed displays receive the new shell.
 - Do not commit a populated root `alerts.json`; production alerts come from the
   alert sidecar. Use a local untracked file only for visual mock data.
 
+## Server-driven refresh (added with the v26 deploy)
+
+Displays that stay open for weeks used to keep running old JS after a redeploy.
+`docker-entrypoint.d/06-app-version.sh` stamps `/version.json` at container start
+(hash of `index.html`, `sw.js`, `css/*.css`, `js/*.js`). `js/appversion.js` holds
+the pure logic; `pollAppVersion()` in `js/app.js` rides the existing 15 s poll,
+records the first value, and on a later change reloads after 0-30 s of jitter,
+only while the app is in `REST` (retries every 10 s otherwise). `/version.json`
+is `no-cache` in `nginx.conf` and network-first in `sw.js`. Displays running a
+pre-v26 build have no poller and need one manual reload.
+
 ## Primary files
 
 - `index.html` — Matrix banner markup, Dismiss button, and landscape alert slots.

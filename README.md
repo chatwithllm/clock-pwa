@@ -554,8 +554,13 @@ Notes:
   `CLOCK_LAT/CLOCK_LON/CLOCK_CITY` in a **`.env`** file or a **`docker-compose.override.yml`**
   (both are auto-loaded by compose and aren't overwritten by pulls). If you did edit
   `docker-compose.yml` directly, use `git stash` → `git pull` → `git stash pop`.
-- **Client devices** (phones/TVs already open) cache via the service worker. After redeploy each
-  device needs **one reload** to pick up the new versioned SW; future loads update automatically.
+- **Client devices** (phones/TVs already open) reload themselves after a redeploy. The container
+  stamps `/version.json` (a content hash of the files the browser runs) at start; every device polls
+  it with its normal ~15 s announcement poll and, when the hash changes, reloads within ~30 s
+  (jittered so a fleet doesn't hit the server at once) — but only while idle, never mid-touch.
+  A rebuild with no file changes keeps the same hash and reloads nothing. Devices still running a
+  build from *before* this feature can't do this, so they need **one manual reload** the first
+  time; every deploy after that refreshes them automatically.
 
 ---
 
