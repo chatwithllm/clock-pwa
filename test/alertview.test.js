@@ -38,6 +38,7 @@ test('alertIcon: known types map to emoji', () => {
   assert.equal(alertIcon('door'), '🚪');
   assert.equal(alertIcon('security'), '🔒');
   assert.equal(alertIcon('smoke'), '🔥');
+  assert.equal(alertIcon('pickup'), '🎒');
 });
 
 test('alertIcon: unknown / missing -> warning default', () => {
@@ -71,9 +72,9 @@ test('alertRailView: same slot takes the worse (critical) severity', () => {
   assert.deepEqual(out, { door: 'critical' });
 });
 
-test('alertRailView: "spare" is never a real type -> falls into "other"', () => {
-  const out = alertRailView([A({key:'k1', type:'spare', severity:'warning'})], 'None');
-  assert.deepEqual(out, { other: 'warning' });
+test('alertRailView: pickup has a dedicated reminder slot', () => {
+  const out = alertRailView([A({key:'k1', type:'pickup', severity:'warning'})], 'None');
+  assert.deepEqual(out, { pickup: 'warning' });
 });
 
 test('alertRailView: respects target/profile filtering', () => {
@@ -86,11 +87,11 @@ test('alertRailView: garbage input yields empty object', () => {
   assert.deepEqual(alertRailView(null, 'x'), {});
 });
 
-test('RAIL_TOP + RAIL_BOTTOM: 6 slots each, cover all 10 known types + other + spare', () => {
+test('RAIL_TOP + RAIL_BOTTOM: 6 slots each, cover all 11 known types + other', () => {
   assert.equal(RAIL_TOP.length, 6);
   assert.equal(RAIL_BOTTOM.length, 6);
   const all = [...RAIL_TOP, ...RAIL_BOTTOM];
   assert.equal(new Set(all).size, 12);
   assert.ok(all.includes('other'));
-  assert.ok(all.includes('spare'));
+  assert.ok(all.includes('pickup'));
 });

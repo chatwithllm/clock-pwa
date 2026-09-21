@@ -97,7 +97,125 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 
 /* ---- Regions ---- */
 .stage{grid-area:stage;min-width:0;min-height:0;display:grid;place-items:center;
-  padding:clamp(4px,2.4vmin,40px)} /* min:0 lets it shrink below content; padding gives the clock air */
+  position:relative;z-index:1;padding:clamp(4px,2.4vmin,40px);
+  transform-origin:calc(100% - clamp(8px,2vmin,24px)) clamp(8px,2vmin,24px);
+  transition:transform 1.25s cubic-bezier(.22,.8,.22,1),opacity .7s ease} /* min:0 lets it shrink below content; padding gives the clock air */
+
+/* Active Matrix calendar event — occupies the clock's stage cell without
+   destroying/rebuilding the clock. The clock continues ticking invisibly and
+   returns as soon as Home Assistant reports the calendar entity off. */
+.matrix-banner{
+  grid-area:stage; min-width:0; min-height:0; overflow:hidden; z-index:2;
+  position:relative; display:flex; align-items:center;
+  margin:clamp(3px,1vmin,12px); padding:clamp(12px,2.2vmin,26px);
+  color:var(--led-on);
+  background:radial-gradient(circle at 50% 50%,rgba(24,58,61,.68),rgba(3,9,11,.94) 72%);
+  border:2px solid rgba(135,206,235,.55); border-radius:clamp(8px,1.8vmin,18px);
+  box-shadow:inset 0 0 70px rgba(135,206,235,.08),0 0 34px rgba(135,206,235,.16);
+  animation:matrixAttention 2.2s ease-in-out infinite;
+}
+.matrix-banner[hidden]{display:none}
+.app.has-matrix-event .stage{
+  z-index:3; transform:scale(.24); opacity:.88; pointer-events:none;
+}
+.matrix-kicker{
+  position:absolute; z-index:1; top:clamp(10px,1.6vmin,18px); left:clamp(12px,2vmin,24px);
+  padding:clamp(6px,1vmin,10px) clamp(9px,1.5vmin,16px);
+  border:1px solid rgba(135,206,235,.62); border-radius:6px;
+  background:linear-gradient(180deg,rgba(25,44,47,.92),rgba(10,20,23,.88));
+  color:var(--led-on); font-size:clamp(9px,1.35vmin,13px); font-weight:800;
+  letter-spacing:.18em; box-shadow:0 0 18px rgba(135,206,235,.1);
+}
+.matrix-kicker-dot{
+  position:absolute; top:7px; right:7px; width:6px; height:6px; border-radius:50%;
+  background:#e7a94a; box-shadow:0 0 9px #e7a94a;
+}
+.matrix-marquee{
+  position:relative; flex:1 1 auto; width:100%; min-width:0; overflow:hidden;
+  display:flex; align-items:center; height:100%;
+  /* Keep the headline optically centered in a clean middle band. Equal space
+     above and below protects it from the Matrix tag, corner clock and dismiss
+     control without pushing the copy toward either edge. */
+  padding:clamp(58px,10vmin,94px) 0;
+  transition:padding .45s cubic-bezier(.22,.8,.22,1);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
+}
+.matrix-track{
+  --matrix-duration:18s;
+  display:flex; align-items:center; width:max-content;
+  animation:matrixScroll var(--matrix-duration) linear infinite;
+  will-change:transform;
+}
+.matrix-text{
+  display:block; flex:0 0 auto; padding-right:clamp(80px,12vw,190px);
+  white-space:nowrap; font-size:clamp(56px,18vmin,210px); font-weight:900;
+  line-height:1; letter-spacing:.01em;
+  transition:font-size .45s cubic-bezier(.22,.8,.22,1);
+  text-shadow:0 0 12px rgba(135,206,235,.4),0 0 38px rgba(135,206,235,.25);
+}
+.matrix-banner.is-static .matrix-marquee{
+  -webkit-mask-image:none; mask-image:none;
+}
+.matrix-banner.is-static .matrix-track{
+  width:100%; height:100%; justify-content:center; animation:none;
+}
+.matrix-banner.is-static .matrix-text{
+  max-width:100%; padding:0; white-space:normal; text-align:center;
+  font-size:clamp(56px,18.5vmin,210px); line-height:1.02;
+}
+.matrix-banner.is-static .matrix-text[aria-hidden="true"]{display:none}
+.matrix-banner.is-interactive .matrix-marquee{
+  padding:clamp(58px,10vmin,94px) clamp(8px,2vw,28px);
+}
+.matrix-banner.is-interactive .matrix-text{
+  font-size:clamp(50px,15vmin,174px);
+}
+.matrix-banner.is-interactive.is-static .matrix-text{
+  font-size:clamp(48px,14vmin,160px);
+}
+.matrix-dismiss{
+  position:absolute; z-index:4; right:clamp(12px,2vmin,24px); bottom:clamp(10px,1.8vmin,20px);
+  min-width:clamp(92px,12vmin,138px); padding:10px 18px;
+  border:1px solid rgba(135,206,235,.65); border-radius:6px;
+  background:rgba(10,20,23,.94); color:var(--led-on); font:inherit;
+  font-size:clamp(12px,1.8vmin,17px); font-weight:800; letter-spacing:.08em;
+  text-transform:uppercase; opacity:0; pointer-events:none;
+  transform:translateY(8px); transition:opacity .25s ease,transform .25s ease,box-shadow .2s ease;
+}
+.matrix-dismiss[hidden]{display:none}
+.matrix-banner.is-interactive .matrix-dismiss{
+  opacity:1; pointer-events:auto; transform:translateY(0);
+}
+.matrix-dismiss:focus-visible,.matrix-dismiss:hover{
+  outline:2px solid var(--focus); outline-offset:2px;
+  box-shadow:0 0 22px rgba(135,206,235,.3);
+}
+@keyframes matrixScroll{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+@keyframes matrixAttention{
+  0%,100%{border-color:rgba(135,206,235,.48);box-shadow:inset 0 0 70px rgba(135,206,235,.07),0 0 24px rgba(135,206,235,.12)}
+  50%{border-color:rgba(231,169,74,.86);box-shadow:inset 0 0 90px rgba(231,169,74,.1),0 0 42px rgba(231,169,74,.34)}
+}
+@media (prefers-reduced-motion:reduce){
+  .matrix-banner{animation:none}
+  .stage{transition:none}
+  .matrix-marquee,.matrix-text{transition:none}
+  .matrix-track{animation:none;max-width:100%}
+  .matrix-text{overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .matrix-text[aria-hidden="true"]{display:none}
+}
+/* On ultra-short landscape displays the compact corner clock preserves a clean
+   center lane for the headline without nudging the copy off the true center. */
+@media (orientation:landscape) and (max-height:420px){
+  .app.has-matrix-event .stage{transform:scale(.19)}
+}
+/* On shallow landscape panels, cap short-message type by width as well as
+   height. This avoids an orphaned final word (for example a lone "PM") while
+   preserving the oversized treatment on taller displays. */
+@media (orientation:landscape) and (max-height:520px){
+  .matrix-banner.is-static .matrix-text{font-size:clamp(56px,7.4vw,78px)}
+  .matrix-banner.is-interactive.is-static .matrix-text{font-size:clamp(48px,6.5vw,68px)}
+}
 /* Landscape: trim the stage padding so the hero clock fills more width (TV-safe
    outer inset is preserved on .app, this only trims the inner cell padding). */
 @media (orientation:landscape){ .stage{padding:clamp(2px,1vmin,14px)} }
@@ -349,6 +467,44 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
   color: var(--sfg, var(--fg, #e6e6e6));
 }
 
+/* Matrix mode temporarily moves the secondary clock into the stage's lower-left
+   corner, balancing the primary clock in the upper-right. Returning to the
+   normal view removes these overrides and restores the original fixed badge. */
+.app.has-matrix-event .second-clock{
+  position:relative;
+  grid-area:stage;
+  align-self:end;
+  justify-self:start;
+  top:auto; right:auto; bottom:auto; left:auto;
+  margin:0 0 clamp(16px,2.4vmin,28px) clamp(16px,2.4vmin,28px);
+  display:grid;
+  grid-template-columns:auto auto;
+  align-items:baseline;
+  gap:3px 8px;
+  z-index:5;
+  opacity:.86;
+  color:var(--led-on);
+}
+.app.has-matrix-event .second-clock[hidden]{display:none}
+.app.has-matrix-event .second-clock .sc-time{
+  grid-column:1 / -1;
+  padding:clamp(5px,.8vmin,9px) clamp(8px,1.2vmin,14px);
+  border-radius:6px;
+  background:rgba(28,31,38,.9);
+  box-shadow:0 0 18px rgba(135,206,235,.1);
+  font-size:clamp(34px,8vmin,78px);
+  font-weight:700;
+  color:var(--led-on);
+}
+.app.has-matrix-event .second-clock .sc-meta{grid-column:1}
+.app.has-matrix-event .second-clock .sc-temp{
+  grid-column:2;
+  font-size:clamp(10px,1.4vmin,16px);
+  color:var(--led-on);
+}
+.app.has-matrix-event .second-clock .sc-label,
+.app.has-matrix-event .second-clock .sc-day{font-size:clamp(9px,1.2vmin,14px)}
+
 /* Wake-lock status indicator (lives in the chrome band; shows when chrome is visible) */
 .wl-status{display:inline-flex;align-items:center;gap:.45em;font:inherit;
   font-size:clamp(11px,2vmin,15px);color:var(--fg-dim);letter-spacing:.02em;
@@ -493,32 +649,138 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 }
 .alert-slot.is-warning .alert-badge, .alert-slot.is-critical .alert-badge{ display:flex; }
 .alert-slot-icon{
-  width:clamp(40px,9vmin,64px); height:clamp(40px,9vmin,64px); border-radius:50%;
+  width:clamp(40px,9vmin,64px); height:clamp(40px,9vmin,64px); border-radius:clamp(6px,1.4vmin,12px);
   display:flex; align-items:center; justify-content:center;
   font-size:clamp(18px,4vmin,26px); line-height:1;
 }
 .alert-slot-label{ font-size:clamp(9px,1.8vmin,12px); letter-spacing:.05em; color:var(--fg); opacity:.85 }
 .alert-slot.is-warning .alert-slot-icon{
-  background:rgba(217,136,58,.16); border:1px solid rgba(217,136,58,.5);
-  box-shadow:0 0 14px rgba(217,136,58,.35);
-  animation:alertHeartbeat 1.8s ease-in-out infinite;
+  color:#fff4df; background:rgba(217,136,58,.28); border:2px solid #f2a24f;
+  box-shadow:0 0 0 2px rgba(217,136,58,.14),0 0 22px rgba(217,136,58,.72),inset 0 0 14px rgba(255,190,105,.16);
+  animation:alertSquareFlash 1.65s ease-in-out infinite;
 }
 .alert-slot.is-critical .alert-slot-icon{
-  background:rgba(255,90,95,.18); border:1px solid rgba(255,90,95,.6);
-  box-shadow:0 0 18px rgba(255,90,95,.45);
-  animation:alertHeartbeat 1s ease-in-out infinite;
+  color:#fff; background:rgba(255,50,58,.34); border:2px solid #ff5a5f;
+  box-shadow:0 0 0 3px rgba(255,90,95,.18),0 0 30px rgba(255,50,58,.9),inset 0 0 16px rgba(255,255,255,.14);
+  animation:alertSquareFlash .9s ease-in-out infinite;
 }
-/* lub-dub: two quick beats then a rest, like an actual pulse */
-@keyframes alertHeartbeat{
-  0%,100%{transform:scale(1)}
-  14%{transform:scale(1.16)}
-  28%{transform:scale(1)}
-  42%{transform:scale(1.12)}
-  70%{transform:scale(1)}
+/* Two bright square flashes followed by a short rest. The tile stays in place
+   (no scale/position movement), making the alarm easier to spot on a wall TV. */
+@keyframes alertSquareFlash{
+  0%,24%,48%,100%{opacity:1;filter:brightness(1.35)}
+  12%,36%,68%{opacity:.38;filter:brightness(.72)}
 }
 @media (prefers-reduced-motion: reduce){
   .alert-slot.is-warning .alert-slot-icon, .alert-slot.is-critical .alert-slot-icon{ animation:none; }
 }
+
+/* Landscape priority dock. The app already reserves a controls band at the
+   bottom; use that otherwise-empty space for all 12 fixed alert positions.
+   The two six-slot rails meet in the middle to form one continuous row. When
+   the user wakes the controls, the dock yields so buttons never overlap it. */
+@media (orientation:landscape){
+  .alert-rail{
+    top:auto; bottom:var(--safe-bottom);
+    height:var(--chrome-band); padding:0; display:grid;
+    grid-template-columns:repeat(6,minmax(0,1fr)); align-items:center;
+    column-gap:clamp(4px,.65vw,9px);
+    opacity:1; transition:opacity .25s ease;
+  }
+  .alert-rail-top{ left:var(--safe-left); right:auto; width:calc(50% - var(--safe-left)); }
+  .alert-rail-bottom{ left:50%; right:var(--safe-right); width:calc(50% - var(--safe-right)); }
+  .alert-rail-group{ display:contents; }
+  .alert-slot{ width:auto; min-width:0; height:100%; align-items:center; }
+  .alert-badge{
+    position:relative; display:flex; justify-content:center; gap:2px;
+    width:100%; height:clamp(46px,7.6vmin,62px); opacity:.2;
+    border:1px solid rgba(135,206,235,.34); border-radius:4px;
+    background:linear-gradient(180deg,rgba(25,44,47,.88),rgba(10,20,23,.82));
+    box-shadow:inset 0 1px 0 rgba(135,206,235,.08);
+    transition:opacity .25s ease,border-color .25s ease,box-shadow .25s ease;
+  }
+  .alert-slot-icon{
+    width:auto; height:auto; border:0; border-radius:0; background:transparent;
+    box-shadow:none; font-size:clamp(17px,3.1vmin,25px); filter:saturate(.78);
+  }
+  .alert-slot-label{
+    font-size:clamp(7px,1.15vmin,10px); font-weight:700; letter-spacing:.08em;
+    text-transform:uppercase; white-space:nowrap; color:var(--led-on); opacity:.82;
+  }
+  .alert-slot.is-warning .alert-badge, .alert-slot.is-critical .alert-badge{ opacity:1; }
+  .alert-slot.is-warning .alert-slot-icon, .alert-slot.is-critical .alert-slot-icon{
+    border:0; background:transparent; box-shadow:none; animation:none; filter:saturate(.9);
+  }
+  .alert-slot.is-warning .alert-badge{
+    --alert-glow:rgba(231,169,74,.48); --alert-glow-low:rgba(231,169,74,.12);
+    border-color:#e7a94a; animation:alertCardFlash 1.65s ease-in-out infinite;
+  }
+  .alert-slot.is-critical .alert-badge{
+    --alert-glow:rgba(255,90,95,.62); --alert-glow-low:rgba(255,90,95,.16);
+    border-color:#ff5a5f; animation:alertCardFlash .9s ease-in-out infinite;
+  }
+  .alert-slot.is-warning .alert-badge::after,
+  .alert-slot.is-critical .alert-badge::after{
+    content:""; position:absolute; top:5px; right:5px; width:6px; height:6px;
+    border-radius:50%; background:#e7a94a; box-shadow:0 0 9px #e7a94a;
+  }
+  .alert-slot.is-critical .alert-badge::after{ background:#ff5a5f; box-shadow:0 0 10px #ff5a5f; }
+  .chrome.is-visible~.alert-rail{ opacity:0; }
+}
+
+@keyframes alertCardFlash{
+  0%,24%,48%,100%{background:linear-gradient(180deg,rgba(31,55,57,.96),rgba(10,20,23,.9));box-shadow:0 0 18px var(--alert-glow),inset 0 1px 0 rgba(255,255,255,.08)}
+  12%,36%,68%{background:linear-gradient(180deg,rgba(16,29,32,.82),rgba(7,14,16,.8));box-shadow:0 0 3px var(--alert-glow-low),inset 0 1px 0 rgba(255,255,255,.03)}
+}
+
+/* Forced landscape mirrors the media-query layout on a portrait device. */
+.app.force-landscape .alert-rail{
+  top:auto; bottom:var(--safe-bottom);
+  height:var(--chrome-band); padding:0; display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr)); align-items:center;
+  column-gap:clamp(4px,.65vw,9px);
+  opacity:1; transition:opacity .25s ease;
+}
+.app.force-landscape .alert-rail-top{ left:var(--safe-left); right:auto; width:calc(50% - var(--safe-left)); }
+.app.force-landscape .alert-rail-bottom{ left:50%; right:var(--safe-right); width:calc(50% - var(--safe-right)); }
+.app.force-landscape .alert-rail-group{ display:contents; }
+.app.force-landscape .alert-slot{ width:auto; min-width:0; height:100%; align-items:center; }
+.app.force-landscape .alert-badge{
+  position:relative; display:flex; justify-content:center; gap:2px;
+  width:100%; height:clamp(46px,7.6vmin,62px); opacity:.2;
+  border:1px solid rgba(135,206,235,.34); border-radius:4px;
+  background:linear-gradient(180deg,rgba(25,44,47,.88),rgba(10,20,23,.82));
+  box-shadow:inset 0 1px 0 rgba(135,206,235,.08);
+  transition:opacity .25s ease,border-color .25s ease,box-shadow .25s ease;
+}
+.app.force-landscape .alert-slot-icon{
+  width:auto; height:auto; border:0; border-radius:0; background:transparent;
+  box-shadow:none; font-size:clamp(17px,3.1vmin,25px); filter:saturate(.78);
+}
+.app.force-landscape .alert-slot-label{
+  font-size:clamp(7px,1.15vmin,10px); font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; white-space:nowrap; color:var(--led-on); opacity:.82;
+}
+.app.force-landscape .alert-slot.is-warning .alert-badge,
+.app.force-landscape .alert-slot.is-critical .alert-badge{ opacity:1; }
+.app.force-landscape .alert-slot.is-warning .alert-slot-icon,
+.app.force-landscape .alert-slot.is-critical .alert-slot-icon{
+  border:0; background:transparent; box-shadow:none; animation:none; filter:saturate(.9);
+}
+.app.force-landscape .alert-slot.is-warning .alert-badge{
+  --alert-glow:rgba(231,169,74,.48); --alert-glow-low:rgba(231,169,74,.12);
+  border-color:#e7a94a; animation:alertCardFlash 1.65s ease-in-out infinite;
+}
+.app.force-landscape .alert-slot.is-critical .alert-badge{
+  --alert-glow:rgba(255,90,95,.62); --alert-glow-low:rgba(255,90,95,.16);
+  border-color:#ff5a5f; animation:alertCardFlash .9s ease-in-out infinite;
+}
+.app.force-landscape .alert-slot.is-warning .alert-badge::after,
+.app.force-landscape .alert-slot.is-critical .alert-badge::after{
+  content:""; position:absolute; top:5px; right:5px; width:6px; height:6px;
+  border-radius:50%; background:#e7a94a; box-shadow:0 0 9px #e7a94a;
+}
+.app.force-landscape .alert-slot.is-critical .alert-badge::after{ background:#ff5a5f; box-shadow:0 0 10px #ff5a5f; }
+.app.force-landscape .chrome.is-visible~.alert-rail{ opacity:0; }
 
 /* HA dashboard overlay — room control panel */
 #dashboard { position: fixed; inset: 0; z-index: 60; display: none;

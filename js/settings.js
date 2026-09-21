@@ -39,6 +39,7 @@ const DEFAULTS = {
   city: null,
   haUrl: '',            // per-device Home Assistant base URL (e.g. https://ha.local:8123)
   haToken: '',          // per-device HA long-lived access token (kept local; never sent to /data)
+  haCalendarEntity: 'calendar.matrix', // active event temporarily replaces the clock with a ticker
 };
 
 function safeLSGet(key){
@@ -88,6 +89,8 @@ function readURL(){
     if (snaps === 'off' || snaps === '0' || snaps === 'false') out.saveSnapshots = false;
     const src = (q.get('source') || '').toLowerCase();
     if (src === 'server' || src === 'local') out.source = src;
+    const calendar = (q.get('calendar') || '').trim().toLowerCase();
+    if (/^calendar\.[a-z0-9_]+$/.test(calendar)) out.haCalendarEntity = calendar;
   } catch (_) {}
   return out;
 }
@@ -131,7 +134,7 @@ export function saveSettings(s){
     presence: s.presence, saveSnapshots: s.saveSnapshots,
     sourceUserSet: s.sourceUserSet,
     lat: s.lat, lon: s.lon, city: s.city,
-    haUrl: s.haUrl, haToken: s.haToken,
+    haUrl: s.haUrl, haToken: s.haToken, haCalendarEntity: s.haCalendarEntity,
   };
   safeLSSet(LS_KEY, JSON.stringify(out));
 }

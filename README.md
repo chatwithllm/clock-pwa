@@ -178,7 +178,17 @@ to the alert banner/overlay. Supported values:
 | `freeze` | 🧊 | Freeze / low temp |
 | `power` | 🔌 | Power / UPS event |
 | `temperature` | 🌡️ | Over-temp sensor |
+| `pickup` | 🎒 | School / kids pickup reminder |
 | *(unknown/omitted)* | ⚠️ | Generic fallback |
+
+In landscape, all twelve alert types occupy a stable bottom status dock. Quiet
+icons remain faint so every type keeps the same position; warning and critical
+alerts use distinct symbols inside compact dark status cards. Active cards gain
+an amber or red border, corner status light, and flashing glow while retaining
+the clock's teal typography and near-black surfaces.
+When the controls appear, the dock
+temporarily fades out so the buttons remain unobstructed. Portrait keeps the
+original top/bottom edge rail and shows only active alerts.
 
 Example automation: leak sensor `on` → `clock_alert` with `severity: critical`,
 `type: water_leak`; `off` → `clock_alert_clear`. Use `warning` for low-stakes
@@ -253,6 +263,32 @@ template:
         device_class: occupancy
         state: "{{ is_state('input_boolean.room_kitchen_occupied', 'on') }}"
 ```
+
+### Matrix priority calendar banner
+
+The display watches a native Home Assistant calendar entity over the existing
+WebSocket connection. It defaults to `calendar.matrix` and can be changed under
+**Settings → Priority calendar entity** (or with `?calendar=calendar.name`).
+
+While that entity is `on`, its standard `message` attribute replaces the clock
+with a full-stage, softly pulsing event panel and oversized continuously
+scrolling headline. Messages of 40 characters or fewer are instead displayed
+as large, centered static text; only longer messages scroll. A small corner tag
+identifies the Matrix source without consuming headline space. The live clock
+animates into the upper-right corner and keeps ticking throughout the event.
+While idle, the headline uses the full event panel at its largest readable
+size. Touching or otherwise interacting with the display temporarily shrinks
+the headline to make room for a Dismiss button. After about five seconds with
+no further input, the button hides and the headline grows again. Dismissal
+applies only to that event on that display. The full clock returns when
+dismissed or when Home Assistant changes the calendar entity to `off`. Weather
+and the landscape alert dock remain visible. No template sensor
+or additional automation is required; Home Assistant's calendar entity owns the
+event lifecycle.
+
+For a local visual preview, open
+`?debug=1&mockCalendar=1`. The mock uses the same entity shape as Home Assistant
+and is disabled on ordinary kiosk URLs.
 
 ### Home Assistant dashboards (per profile)
 

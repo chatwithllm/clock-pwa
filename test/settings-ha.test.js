@@ -17,10 +17,13 @@ test('HA connection fields default to empty and persist', () => {
   const s = loadSettings();
   assert.equal(s.haUrl, '');
   assert.equal(s.haToken, '');
+  assert.equal(s.haCalendarEntity, 'calendar.matrix');
   s.haUrl = 'https://ha.local:8123';
   s.haToken = 'llt_secret';
+  s.haCalendarEntity = 'calendar.family';
   saveSettings(s);
   const again = loadSettings();
   assert.equal(again.haUrl, 'https://ha.local:8123');
   assert.equal(again.haToken, 'llt_secret');
+  assert.equal(again.haCalendarEntity, 'calendar.family');
 });

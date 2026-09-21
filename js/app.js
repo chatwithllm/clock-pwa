@@ -16,6 +16,7 @@ import { SunArc } from './sunarc.js';
 import { createHaClient } from './ha.js';
 import { validateDashboards, resolveDashboard, tileAction } from './ha-dashboard.js';
 import { renderDashboard } from './dashboard-view.js';
+import { calendarBannerView } from './calendar-banner.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -78,6 +79,7 @@ const app = {
   _entities: {},
   _ha: null,
   _haStatus: 'off',
+  _dismissedCalendarKey: '',
   _announceQueue: [],
   _announceDismissed: null,
   _announceModal: false,
@@ -132,6 +134,7 @@ function setState(next){
     app.nav.setScope(panel);
     app.nav.focusFirst();
   }
+  syncMatrixInteraction();
 }
 
 function clearIdle(){ if (app.idleTimer){ clearTimeout(app.idleTimer); app.idleTimer = null; } }
@@ -509,6 +512,7 @@ function syncButtons(){
   const hasDash = !!resolveDashboard(app._dashboards, app.settings.profile);
   $('btnDashboard').hidden = !(app._haStatus === 'authed' && hasDash);
   if ($('setHaUrl') && document.activeElement !== $('setHaUrl')) $('setHaUrl').value = app.settings.haUrl || '';
+  if ($('setHaCalendar') && document.activeElement !== $('setHaCalendar')) $('setHaCalendar').value = app.settings.haCalendarEntity || 'calendar.matrix';
   syncDimButton();
 }
 function syncDimButton(){
@@ -730,7 +734,7 @@ const RAIL_ID = {
   water_leak:'railWater_leak', window:'railWindow', security:'railSecurity',
   temperature:'railTemperature', motion:'railMotion', power:'railPower',
   door:'railDoor', smoke:'railSmoke', co:'railCo', freeze:'railFreeze',
-  other:'railOther', spare:'railSpare',
+  pickup:'railPickup', other:'railOther',
 };
 const RAIL_TYPES = [...RAIL_TOP, ...RAIL_BOTTOM];
 
@@ -744,10 +748,11 @@ function renderAlertRail(){
       const sev = rail[t];
       el.classList.toggle('is-critical', sev === 'critical');
       el.classList.toggle('is-warning', sev === 'warning');
-      if (sev){
-        const icon = el.querySelector('.alert-slot-icon');
-        if (icon) icon.textContent = alertIcon(t);
-      }
+      // Landscape keeps every slot visible as a quiet, fixed-position icon;
+      // portrait still hides inactive badges in CSS. Populate the icon in
+      // both states so the landscape dock never shifts when an alert arrives.
+      const icon = el.querySelector('.alert-slot-icon');
+      if (icon) icon.textContent = alertIcon(t);
     }
   } catch(_) { /* never break the clock */ }
 }
@@ -942,6 +947,89 @@ async function pollDashboards(){
 }
 
 // (Re)connect the HA client from the current per-device settings.
+function renderMatrixCalendar(){
+  try {
+    const banner = $('matrixBanner');
+    const root = $('app');
+    if (!banner || !root) return;
+    const entityId = (app.settings && app.settings.haCalendarEntity) || 'calendar.matrix';
+    const view = calendarBannerView(app._entities && app._entities[entityId]);
+    if (!view){
+      app._dismissedCalendarKey = '';
+      banner.hidden = true;
+      root.classList.remove('has-matrix-event');
+      banner.dataset.text = '';
+      return;
+    }
+
+    if (app._dismissedCalendarKey === view.key){
+      banner.hidden = true;
+      root.classList.remove('has-matrix-event');
+      return;
+    }
+
+    banner.classList.toggle('is-static', view.mode === 'static');
+
+    if (banner.dataset.text !== view.text){
+      $('matrixText').textContent = view.text;
+      $('matrixTextCopy').textContent = view.text;
+      banner.dataset.text = view.text;
+      const duration = Math.max(12, Math.min(42, 8 + view.text.length * .22));
+      const track = $('matrixTrack');
+      track.style.setProperty('--matrix-duration', duration + 's');
+      // Restart at the leading edge when HA advances to a different event.
+      if (view.mode === 'scroll'){
+        track.style.animation = 'none';
+        void track.offsetWidth;
+        track.style.animation = '';
+      }
+    }
+    banner.hidden = false;
+    root.classList.add('has-matrix-event');
+    banner.dataset.key = view.key;
+    syncMatrixInteraction();
+  } catch(_) { /* a calendar display issue must never disturb the clock */ }
+}
+
+function syncMatrixInteraction(){
+  try {
+    const banner = $('matrixBanner');
+    const button = $('matrixDismiss');
+    const visible = !!banner && !banner.hidden && app.state !== REST;
+    if (banner) banner.classList.toggle('is-interactive', visible);
+    if (button) button.hidden = !visible;
+  } catch(_){}
+}
+
+function dismissMatrixCalendar(){
+  try {
+    const banner = $('matrixBanner');
+    if (!banner || banner.hidden) return;
+    app._dismissedCalendarKey = banner.dataset.key || banner.dataset.text || '';
+    renderMatrixCalendar();
+  } catch(_){}
+}
+
+// Development-only preview: ?debug=1&mockCalendar=1 seeds the same entity
+// shape Home Assistant sends. It never runs on an ordinary kiosk URL.
+function seedMatrixCalendarMock(){
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('debug') !== '1' || q.get('mockCalendar') !== '1') return;
+    const entityId = app.settings.haCalendarEntity || 'calendar.matrix';
+    app._entities = Object.assign({}, app._entities, {
+      [entityId]: {
+        entity_id: entityId,
+        state: 'on',
+        attributes: {
+          message: 'Kids pickup at 2:30 PM',
+          location: 'Matrix calendar',
+        },
+      },
+    });
+  } catch(_){}
+}
+
 function connectHA(){
   try { if (app._ha) { app._ha.close(); app._ha = null; } } catch(_){}
   const { haUrl, haToken } = app.settings;
@@ -949,7 +1037,11 @@ function connectHA(){
   app._ha = createHaClient({
     url: haUrl, token: haToken,
     onStatus: (s) => { app._haStatus = s; setHaStatusText(s); syncButtons(); },
-    onEntities: (e) => { app._entities = e; if ($('dashboard').classList.contains('is-open')) renderActiveDashboard(); },
+    onEntities: (e) => {
+      app._entities = e;
+      renderMatrixCalendar();
+      if ($('dashboard').classList.contains('is-open')) renderActiveDashboard();
+    },
   });
 }
 
@@ -1078,6 +1170,12 @@ function wireControls(){
   });
   $('setHaUrl').addEventListener('change', () => { app.settings.haUrl = $('setHaUrl').value.trim(); persist(); });
   $('setHaToken').addEventListener('change', () => { app.settings.haToken = $('setHaToken').value.trim(); persist(); });
+  $('setHaCalendar').addEventListener('change', () => {
+    const v = $('setHaCalendar').value.trim().toLowerCase();
+    if (/^calendar\.[a-z0-9_]+$/.test(v)) app.settings.haCalendarEntity = v;
+    else $('setHaCalendar').value = app.settings.haCalendarEntity || 'calendar.matrix';
+    persist(); renderMatrixCalendar();
+  });
   $('setHaConnect').addEventListener('click', () => {
     app.settings.haUrl = $('setHaUrl').value.trim();
     app.settings.haToken = $('setHaToken').value.trim();
@@ -1087,6 +1185,7 @@ function wireControls(){
   $('dashClose').addEventListener('click', closeDashboard);
   $('announceClose').addEventListener('click', dismissAnnounce);
   $('announce').addEventListener('click', (e) => { if (e.target === $('announce')) dismissAnnounce(); });
+  $('matrixDismiss').addEventListener('click', dismissMatrixCalendar);
   $('setClose').addEventListener('click', () => setState(ACTIVE));
 
   $('setCityGo').addEventListener('click', doCitySearch);
@@ -1192,7 +1291,8 @@ async function boot(){
     app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
                      sunArc:true, hour24:false, seconds:true, date:true, night:true,
                      nightStart:21, nightEnd:7, source:'server', locationMode:'server', timeSource:'server', profile:'None', secondTz:'off',
-                     lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
+                     lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city,
+                     haUrl:'', haToken:'', haCalendarEntity:'calendar.matrix' };
   }
 
   try { app.reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(_){ app.reduceMotion = false; }
@@ -1308,6 +1408,8 @@ async function boot(){
   // Home Assistant dashboards: restore cached tiles, then connect the client.
   try { app._dashboards = validateDashboards(JSON.parse(localStorage.getItem(DASHBOARDS_KEY) || 'null')); } catch(_){}
   connectHA();
+  seedMatrixCalendarMock();
+  renderMatrixCalendar();
 
   // Critical alerts (Home Assistant push channel): poll every 5s + on refocus.
   app._alertChimed = new Set();
