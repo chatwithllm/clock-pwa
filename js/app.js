@@ -946,7 +946,7 @@ async function pollDashboards(){
   } catch(_) { /* offline — keep cached value */ }
 }
 
-// (Re)connect the HA client from the current per-device settings.
+// Project the configured HA calendar entity onto the Matrix takeover panel.
 function renderMatrixCalendar(){
   try {
     const banner = $('matrixBanner');
@@ -969,6 +969,7 @@ function renderMatrixCalendar(){
     }
 
     banner.classList.toggle('is-static', view.mode === 'static');
+    banner.classList.toggle('is-long', view.long);
 
     if (banner.dataset.text !== view.text){
       $('matrixText').textContent = view.text;
@@ -1030,6 +1031,7 @@ function seedMatrixCalendarMock(){
   } catch(_){}
 }
 
+// (Re)connect the HA client from the current per-device settings.
 function connectHA(){
   try { if (app._ha) { app._ha.close(); app._ha = null; } } catch(_){}
   const { haUrl, haToken } = app.settings;

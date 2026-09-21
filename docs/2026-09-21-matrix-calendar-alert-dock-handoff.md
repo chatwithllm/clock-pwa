@@ -55,6 +55,11 @@ HA entity lookup, dismissal, and the development mock live in `js/app.js`.
   primary upper-right, secondary lower-left.
 - On shallow landscape screens, static headline size is capped by width so a
   trailing word such as `PM` does not become an orphaned second line.
+- Static headlines use `text-wrap: balance` so a wrapped message never strands its
+  last word (e.g. a lone `PM`), including in the touch/Dismiss state at 1280×720.
+- Static headlines over 24 characters get `is-long` (`calendarBannerLong()`),
+  which shrinks the type on shallow landscape screens (`max-height:520px`) so a
+  two-line headline clears the lower-left secondary clock at 1024×400.
 - When Matrix mode ends, do not leave event-specific clock positioning behind;
   all normal clock layout must restore automatically through removal of the
   `has-matrix-event` class.
@@ -93,7 +98,7 @@ Run the automated suite with:
 npm test
 ```
 
-At handoff, 85 tests pass. Calendar behavior is covered by
+Currently 86 tests pass. Calendar behavior is covered by
 `test/calendar-banner.test.js`; alert slot behavior is covered by
 `test/alertview.test.js`; settings persistence is covered by
 `test/settings-ha.test.js`.
@@ -101,8 +106,8 @@ At handoff, 85 tests pass. Calendar behavior is covered by
 ## Offline/PWA details
 
 `js/calendar-banner.js` is part of the service-worker shell cache. The cache was
-bumped to `clockpwa-shell-v25` / `clockpwa-runtime-v25` when this feature was
-added. Future module additions must also be added to `SHELL_FILES` and should
+bumped to `clockpwa-shell-v26` / `clockpwa-runtime-v26` (v25 when the feature landed, v26
+for the headline wrap fixes below). Future module additions must also be added to `SHELL_FILES` and should
 advance the cache version so installed displays receive the new shell.
 
 ## Safe continuation points

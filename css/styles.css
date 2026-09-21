@@ -163,6 +163,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .matrix-banner.is-static .matrix-text{
   max-width:100%; padding:0; white-space:normal; text-align:center;
   font-size:clamp(56px,18.5vmin,210px); line-height:1.02;
+  /* Balance line lengths so a wrapped headline never strands its last word
+     (e.g. a lone "PM") on its own line. Older TV browsers ignore this and
+     keep the normal wrap. */
+  text-wrap:balance;
 }
 .matrix-banner.is-static .matrix-text[aria-hidden="true"]{display:none}
 .matrix-banner.is-interactive .matrix-marquee{
@@ -215,6 +219,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 @media (orientation:landscape) and (max-height:520px){
   .matrix-banner.is-static .matrix-text{font-size:clamp(56px,7.4vw,78px)}
   .matrix-banner.is-interactive.is-static .matrix-text{font-size:clamp(48px,6.5vw,68px)}
+  /* Longer headlines wrap to two lines here; smaller type keeps both lines
+     clear of the lower-left secondary clock and the upper-right primary. */
+  .matrix-banner.is-static.is-long .matrix-text{font-size:clamp(38px,5vw,54px)}
+  .matrix-banner.is-interactive.is-static.is-long .matrix-text{font-size:clamp(34px,4.5vw,48px)}
 }
 /* Landscape: trim the stage padding so the hero clock fills more width (TV-safe
    outer inset is preserved on .app, this only trims the inner cell padding). */
