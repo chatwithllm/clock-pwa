@@ -9,3 +9,8 @@ __pycache__/
 
 # graphify knowledge-graph output (local artifact)
 graphify-out/
+
+# --- housekeeping (claude) ---
+**/.DS_Store
+.claude/
+.planning/

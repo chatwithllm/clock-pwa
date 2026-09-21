@@ -13,6 +13,11 @@ import { weatherColor } from './feelcolor.js';
 import { alertView, alertIcon, alertRailView, RAIL_TOP, RAIL_BOTTOM } from './alertview.js';
 import { Presence } from './presence.js';
 import { SunArc } from './sunarc.js';
+import { createHaClient } from './ha.js';
+import { validateDashboards, resolveDashboard, tileAction } from './ha-dashboard.js';
+import { renderDashboard } from './dashboard-view.js';
+import { calendarBannerView } from './calendar-banner.js';
+import { parseVersion, versionChanged, reloadDelayMs } from './appversion.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,6 +40,7 @@ const SERVERLOC_KEY = 'clockpwa.serverloc.v1';
 // (admin-managed) and merged in; built-ins always present even if that's empty.
 const BUILTINS = ['Theater Room','Study Room','Kitchen','Living Room','Bedroom','Office','Garage'];
 const PROFILES_KEY = 'clockpwa.profiles.v1';
+const DASHBOARDS_KEY = 'clockpwa.dashboards.v1';
 const ANNOUNCE_DISMISSED_KEY = 'clockpwa.announceDismissed';
 const ANNOUNCE_STACK_CAP = 4;
 const ANNOUNCE_POLL_MS = 15000;
@@ -70,6 +76,11 @@ const app = {
   wake: null,
   isTV: false,
   _customProfiles: [],
+  _dashboards: { version: 1, profiles: {} },
+  _entities: {},
+  _ha: null,
+  _haStatus: 'off',
+  _dismissedCalendarKey: '',
   _announceQueue: [],
   _announceDismissed: null,
   _announceModal: false,
@@ -107,6 +118,7 @@ function setState(next){
     chrome.classList.remove('is-visible');
     panel.classList.remove('is-open');
     panel.setAttribute('aria-hidden','true');
+    closeDashboard();
     clearIdle();
     app.nav.setScope(document);
   } else if (next === ACTIVE){
@@ -123,6 +135,7 @@ function setState(next){
     app.nav.setScope(panel);
     app.nav.focusFirst();
   }
+  syncMatrixInteraction();
 }
 
 function clearIdle(){ if (app.idleTimer){ clearTimeout(app.idleTimer); app.idleTimer = null; } }
@@ -497,6 +510,10 @@ function syncButtons(){
   $('setSound').textContent = (app.settings && app.settings.soundEnabled) ? 'On' : 'Off';
   $('setPresence').textContent = app.settings.presence ? 'On' : 'Off';
   $('setSnapshots').textContent = app.settings.saveSnapshots ? 'On' : 'Off';
+  const hasDash = !!resolveDashboard(app._dashboards, app.settings.profile);
+  $('btnDashboard').hidden = !(app._haStatus === 'authed' && hasDash);
+  if ($('setHaUrl') && document.activeElement !== $('setHaUrl')) $('setHaUrl').value = app.settings.haUrl || '';
+  if ($('setHaCalendar') && document.activeElement !== $('setHaCalendar')) $('setHaCalendar').value = app.settings.haCalendarEntity || 'calendar.matrix';
   syncDimButton();
 }
 function syncDimButton(){
@@ -718,7 +735,7 @@ const RAIL_ID = {
   water_leak:'railWater_leak', window:'railWindow', security:'railSecurity',
   temperature:'railTemperature', motion:'railMotion', power:'railPower',
   door:'railDoor', smoke:'railSmoke', co:'railCo', freeze:'railFreeze',
-  other:'railOther', spare:'railSpare',
+  pickup:'railPickup', other:'railOther',
 };
 const RAIL_TYPES = [...RAIL_TOP, ...RAIL_BOTTOM];
 
@@ -732,10 +749,11 @@ function renderAlertRail(){
       const sev = rail[t];
       el.classList.toggle('is-critical', sev === 'critical');
       el.classList.toggle('is-warning', sev === 'warning');
-      if (sev){
-        const icon = el.querySelector('.alert-slot-icon');
-        if (icon) icon.textContent = alertIcon(t);
-      }
+      // Landscape keeps every slot visible as a quiet, fixed-position icon;
+      // portrait still hides inactive badges in CSS. Populate the icon in
+      // both states so the landscape dock never shifts when an alert arrives.
+      const icon = el.querySelector('.alert-slot-icon');
+      if (icon) icon.textContent = alertIcon(t);
     }
   } catch(_) { /* never break the clock */ }
 }
@@ -915,6 +933,183 @@ async function pollProfiles(){
   } catch(_) { /* offline / no file — keep cached value */ }
 }
 
+// Poll the admin-managed per-profile dashboards (network-first); cache offline.
+async function pollDashboards(){
+  if (typeof fetch !== 'function') return;
+  try {
+    const r = await fetch('dashboards.json?ts=' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    app._dashboards = validateDashboards(j);
+    try { localStorage.setItem(DASHBOARDS_KEY, JSON.stringify(app._dashboards)); } catch(_){}
+    syncButtons();
+    if ($('dashboard').classList.contains('is-open')) renderActiveDashboard();
+  } catch(_) { /* offline — keep cached value */ }
+}
+
+// Project the configured HA calendar entity onto the Matrix takeover panel.
+function renderMatrixCalendar(){
+  try {
+    const banner = $('matrixBanner');
+    const root = $('app');
+    if (!banner || !root) return;
+    const entityId = (app.settings && app.settings.haCalendarEntity) || 'calendar.matrix';
+    const view = calendarBannerView(app._entities && app._entities[entityId]);
+    if (!view){
+      app._dismissedCalendarKey = '';
+      banner.hidden = true;
+      root.classList.remove('has-matrix-event');
+      banner.dataset.text = '';
+      return;
+    }
+
+    if (app._dismissedCalendarKey === view.key){
+      banner.hidden = true;
+      root.classList.remove('has-matrix-event');
+      return;
+    }
+
+    banner.classList.toggle('is-static', view.mode === 'static');
+    banner.classList.toggle('is-long', view.long);
+
+    if (banner.dataset.text !== view.text){
+      $('matrixText').textContent = view.text;
+      $('matrixTextCopy').textContent = view.text;
+      banner.dataset.text = view.text;
+      const duration = Math.max(12, Math.min(42, 8 + view.text.length * .22));
+      const track = $('matrixTrack');
+      track.style.setProperty('--matrix-duration', duration + 's');
+      // Restart at the leading edge when HA advances to a different event.
+      if (view.mode === 'scroll'){
+        track.style.animation = 'none';
+        void track.offsetWidth;
+        track.style.animation = '';
+      }
+    }
+    banner.hidden = false;
+    root.classList.add('has-matrix-event');
+    banner.dataset.key = view.key;
+    syncMatrixInteraction();
+  } catch(_) { /* a calendar display issue must never disturb the clock */ }
+}
+
+function syncMatrixInteraction(){
+  try {
+    const banner = $('matrixBanner');
+    const button = $('matrixDismiss');
+    const visible = !!banner && !banner.hidden && app.state !== REST;
+    if (banner) banner.classList.toggle('is-interactive', visible);
+    if (button) button.hidden = !visible;
+  } catch(_){}
+}
+
+function dismissMatrixCalendar(){
+  try {
+    const banner = $('matrixBanner');
+    if (!banner || banner.hidden) return;
+    app._dismissedCalendarKey = banner.dataset.key || banner.dataset.text || '';
+    renderMatrixCalendar();
+  } catch(_){}
+}
+
+// Development-only preview: ?debug=1&mockCalendar=1 seeds the same entity
+// shape Home Assistant sends. It never runs on an ordinary kiosk URL.
+function seedMatrixCalendarMock(){
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('debug') !== '1' || q.get('mockCalendar') !== '1') return;
+    const entityId = app.settings.haCalendarEntity || 'calendar.matrix';
+    app._entities = Object.assign({}, app._entities, {
+      [entityId]: {
+        entity_id: entityId,
+        state: 'on',
+        attributes: {
+          message: 'Kids pickup at 2:30 PM',
+          location: 'Matrix calendar',
+        },
+      },
+    });
+  } catch(_){}
+}
+
+// Server-driven refresh: /version.json is stamped at container start. The first
+// poll records the baseline; a later change means the server was redeployed, so
+// reload (jittered, and only while the display is idle) to pick up the new code.
+async function pollAppVersion(){
+  try {
+    const r = await fetch('version.json?ts=' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return;
+    const v = parseVersion(await r.json());
+    if (!v) return;
+    if (!app._appVersion){ app._appVersion = v; return; }
+    if (versionChanged(app._appVersion, v)) scheduleAppReload();
+  } catch(_) { /* offline or no version.json — keep running */ }
+}
+
+function scheduleAppReload(){
+  if (app._reloadPending) return;
+  app._reloadPending = true;
+  const attempt = () => {
+    // Never yank the screen from someone mid-interaction; retry shortly.
+    if (app.state !== REST){ setTimeout(attempt, 10000); return; }
+    location.reload();
+  };
+  setTimeout(attempt, reloadDelayMs(Math.random()));
+}
+
+// (Re)connect the HA client from the current per-device settings.
+function connectHA(){
+  try { if (app._ha) { app._ha.close(); app._ha = null; } } catch(_){}
+  const { haUrl, haToken } = app.settings;
+  if (!haUrl || !haToken){ app._haStatus = 'off'; syncButtons(); return; }
+  app._ha = createHaClient({
+    url: haUrl, token: haToken,
+    onStatus: (s) => { app._haStatus = s; setHaStatusText(s); syncButtons(); },
+    onEntities: (e) => {
+      app._entities = e;
+      renderMatrixCalendar();
+      if ($('dashboard').classList.contains('is-open')) renderActiveDashboard();
+    },
+  });
+}
+
+function setHaStatusText(s){
+  const el = $('haStatus'); if (!el) return;
+  el.textContent = s === 'authed' ? '● Connected'
+    : s === 'auth_invalid' ? 'Auth failed — check token'
+    : s === 'connecting' || s === 'authenticating' ? 'Connecting…' : '';
+}
+
+// Guard: a stateless scene/button tile is always actionable. An entity-bound
+// tile (toggle/climate) is only actionable when its cached state exists and
+// isn't unavailable/unknown — otherwise a climate tile has no setpoint and
+// tileAction() would compute one from a base of 0 (e.g. send temperature:0.5).
+function tileTapIsActionable(tile){
+  if (!tile || !tile.entity) return true;
+  const st = app._entities[tile.entity];
+  return !!st && st.state !== 'unavailable' && st.state !== 'unknown';
+}
+
+function renderActiveDashboard(){
+  const dash = resolveDashboard(app._dashboards, app.settings.profile);
+  renderDashboard($('dashGrid'), dash, app._entities, (tile, dir) => {
+    if (!tileTapIsActionable(tile)) return;
+    const action = tileAction(tile, tile.entity ? app._entities[tile.entity] : undefined, dir);
+    if (action && app._ha) app._ha.callService(action);
+  });
+}
+
+function openDashboard(){
+  renderActiveDashboard();
+  $('dashboard').classList.add('is-open');
+  app.nav.setScope($('dashboard'));
+  app.nav.focusFirst();
+}
+function closeDashboard(){
+  $('dashboard').classList.remove('is-open');
+  app.nav.setScope(document);
+}
+
 // Dismiss the currently-centered announcement: remember its id, then re-render
 // (promotes the next-newest live entry into the center, or hides if none left).
 function dismissAnnounce(){
@@ -1001,8 +1196,24 @@ function wireControls(){
     app.settings.profile = list[(i + 1) % list.length] || 'None';
     persist(); syncButtons();
   });
+  $('setHaUrl').addEventListener('change', () => { app.settings.haUrl = $('setHaUrl').value.trim(); persist(); });
+  $('setHaToken').addEventListener('change', () => { app.settings.haToken = $('setHaToken').value.trim(); persist(); });
+  $('setHaCalendar').addEventListener('change', () => {
+    const v = $('setHaCalendar').value.trim().toLowerCase();
+    if (/^calendar\.[a-z0-9_]+$/.test(v)) app.settings.haCalendarEntity = v;
+    else $('setHaCalendar').value = app.settings.haCalendarEntity || 'calendar.matrix';
+    persist(); renderMatrixCalendar();
+  });
+  $('setHaConnect').addEventListener('click', () => {
+    app.settings.haUrl = $('setHaUrl').value.trim();
+    app.settings.haToken = $('setHaToken').value.trim();
+    persist(); setHaStatusText('connecting'); connectHA();
+  });
+  $('btnDashboard').addEventListener('click', openDashboard);
+  $('dashClose').addEventListener('click', closeDashboard);
   $('announceClose').addEventListener('click', dismissAnnounce);
   $('announce').addEventListener('click', (e) => { if (e.target === $('announce')) dismissAnnounce(); });
+  $('matrixDismiss').addEventListener('click', dismissMatrixCalendar);
   $('setClose').addEventListener('click', () => setState(ACTIVE));
 
   $('setCityGo').addEventListener('click', doCitySearch);
@@ -1063,6 +1274,7 @@ function wireInput(){
   app.nav = new DpadNav({
     onEscape: () => {
       if ($('announce') && !$('announce').hidden){ dismissAnnounce(); return; }
+      if ($('dashboard') && $('dashboard').classList.contains('is-open')){ closeDashboard(); return; }
       if (app.state === PANEL) setState(ACTIVE);
     },
     onActivate: () => { if (app.state === ACTIVE) resetIdle(); },
@@ -1107,7 +1319,8 @@ async function boot(){
     app.settings = { mode:'digital', clockStyle:'classic', orientation:'auto', display:'dynamic',
                      sunArc:true, hour24:false, seconds:true, date:true, night:true,
                      nightStart:21, nightEnd:7, source:'server', locationMode:'server', timeSource:'server', profile:'None', secondTz:'off',
-                     lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city };
+                     lat:DEFAULT_LOCATION.lat, lon:DEFAULT_LOCATION.lon, city:DEFAULT_LOCATION.city,
+                     haUrl:'', haToken:'', haCalendarEntity:'calendar.matrix' };
   }
 
   try { app.reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(_){ app.reduceMotion = false; }
@@ -1209,10 +1422,22 @@ async function boot(){
   app._announceQueue = [];
   app._soundedIds = new Set();
   try {
-    pollAnnounce(); pollProfiles(); pollSource();
-    app.announceTimer = setInterval(() => { pollAnnounce(); pollProfiles(); pollSource(); }, ANNOUNCE_POLL_MS);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); pollSource(); } });
+    pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); pollAppVersion();
+    // Noncritical polling pauses while the tab is hidden; the visibilitychange
+    // handler below refreshes immediately on return. Critical alerts (below)
+    // deliberately keep their 5s cadence and are NOT gated on visibility.
+    app.announceTimer = setInterval(() => {
+      if (document.hidden) return;
+      pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); pollAppVersion();
+    }, ANNOUNCE_POLL_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden){ pollAnnounce(); pollProfiles(); pollSource(); pollDashboards(); pollAppVersion(); } });
   } catch(_){}
+
+  // Home Assistant dashboards: restore cached tiles, then connect the client.
+  try { app._dashboards = validateDashboards(JSON.parse(localStorage.getItem(DASHBOARDS_KEY) || 'null')); } catch(_){}
+  connectHA();
+  seedMatrixCalendarMock();
+  renderMatrixCalendar();
 
   // Critical alerts (Home Assistant push channel): poll every 5s + on refocus.
   app._alertChimed = new Set();

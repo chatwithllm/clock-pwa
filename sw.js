@@ -1,8 +1,8 @@
 // sw.js — cache-first app shell; network-first w/ cache fallback for Open-Meteo.
 // Registers only over HTTPS/localhost (browsers block SW on plain-http LAN IPs).
 
-const SHELL = 'clockpwa-shell-v20';
-const RUNTIME = 'clockpwa-runtime-v20';
+const SHELL = 'clockpwa-shell-v26';
+const RUNTIME = 'clockpwa-runtime-v26';
 
 const SHELL_FILES = [
   './',
@@ -20,7 +20,13 @@ const SHELL_FILES = [
   './js/feelcolor.js',
   './js/source.js',
   './js/alertview.js',
+  './js/calendar-banner.js',
+  './js/appversion.js',
   './js/presence.js',
+  './js/ha.js',
+  './js/ha-protocol.js',
+  './js/ha-dashboard.js',
+  './js/dashboard-view.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
@@ -50,6 +56,8 @@ self.addEventListener('fetch', (e) => {
   if (url.pathname === '/config.json' || url.pathname === '/weather.json'
       || url.pathname === '/announce.json' || url.pathname === '/profiles.json'
       || url.pathname === '/source.json' || url.pathname === '/alerts.json'
+      || url.pathname === '/dashboards.json'
+      || url.pathname === '/version.json'
       || url.hostname.endsWith('zippopotam.us')){
     e.respondWith(
       fetch(req).then((res) => {

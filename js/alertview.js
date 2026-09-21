@@ -18,19 +18,21 @@ export function alertView(list, profile){
 const ALERT_ICONS = {
   water_leak: '💧', door: '🚪', window: '🪟', security: '🔒', smoke: '🔥',
   co: '☣️', motion: '🚶', freeze: '🧊', power: '🔌', temperature: '🌡️',
+  pickup: '🎒',
 };
 export function alertIcon(type){
   return ALERT_ICONS[type] || '⚠️';
 }
 
-// Fixed-position alert rail: 6 slots along the top edge, 6 along the bottom.
-// Each slot renders only when its type has an active alert — true blank
-// space otherwise. Positions never move, so a room learns "top-left = leak"
-// by muscle memory instead of reading a list every time. 'other' catches any
-// type not in ALERT_ICONS; 'spare' is reserved for a future 11th type.
+// Fixed-position alert rail: 6 slots per half. Portrait places the halves on
+// the top/bottom edges and only renders active alerts; landscape joins them
+// into a 12-position bottom dock with quiet placeholders. Positions never
+// move, so a room learns where each type lives by muscle memory. 'other'
+// catches any type not in ALERT_ICONS. The former spare slot is now a family
+// reminder slot (`pickup`) for a school-pickup alert from HA.
 export const RAIL_TOP = ['water_leak', 'window', 'security', 'temperature', 'motion', 'power'];
-export const RAIL_BOTTOM = ['door', 'smoke', 'co', 'freeze', 'other', 'spare'];
-const RAIL_KNOWN = new Set([...RAIL_TOP, ...RAIL_BOTTOM].filter(t => t !== 'other' && t !== 'spare'));
+export const RAIL_BOTTOM = ['door', 'smoke', 'co', 'freeze', 'pickup', 'other'];
+const RAIL_KNOWN = new Set([...RAIL_TOP, ...RAIL_BOTTOM].filter(t => t !== 'other'));
 
 // alertRailView(list, profile) -> { [slotType]: 'critical'|'warning', ... }
 // Only slots with an active alert appear as keys. Multiple alerts of the same

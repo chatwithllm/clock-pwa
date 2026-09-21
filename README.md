@@ -178,7 +178,17 @@ to the alert banner/overlay. Supported values:
 | `freeze` | 🧊 | Freeze / low temp |
 | `power` | 🔌 | Power / UPS event |
 | `temperature` | 🌡️ | Over-temp sensor |
+| `pickup` | 🎒 | School / kids pickup reminder |
 | *(unknown/omitted)* | ⚠️ | Generic fallback |
+
+In landscape, all twelve alert types occupy a stable bottom status dock. Quiet
+icons remain faint so every type keeps the same position; warning and critical
+alerts use distinct symbols inside compact dark status cards. Active cards gain
+an amber or red border, corner status light, and flashing glow while retaining
+the clock's teal typography and near-black surfaces.
+When the controls appear, the dock
+temporarily fades out so the buttons remain unobstructed. Portrait keeps the
+original top/bottom edge rail and shows only active alerts.
 
 Example automation: leak sensor `on` → `clock_alert` with `severity: critical`,
 `type: water_leak`; `off` → `clock_alert_clear`. Use `warning` for low-stakes
@@ -253,6 +263,79 @@ template:
         device_class: occupancy
         state: "{{ is_state('input_boolean.room_kitchen_occupied', 'on') }}"
 ```
+
+### Matrix priority calendar banner
+
+The display watches a native Home Assistant calendar entity over the existing
+WebSocket connection. It defaults to `calendar.matrix` and can be changed under
+**Settings → Priority calendar entity** (or with `?calendar=calendar.name`).
+
+While that entity is `on`, its standard `message` attribute replaces the clock
+with a full-stage, softly pulsing event panel and oversized continuously
+scrolling headline. Messages of 40 characters or fewer are instead displayed
+as large, centered static text; only longer messages scroll. A small corner tag
+identifies the Matrix source without consuming headline space. The live clock
+animates into the upper-right corner and keeps ticking throughout the event.
+While idle, the headline uses the full event panel at its largest readable
+size. Touching or otherwise interacting with the display temporarily shrinks
+the headline to make room for a Dismiss button. After about five seconds with
+no further input, the button hides and the headline grows again. Dismissal
+applies only to that event on that display. The full clock returns when
+dismissed or when Home Assistant changes the calendar entity to `off`. Weather
+and the landscape alert dock remain visible. No template sensor
+or additional automation is required; Home Assistant's calendar entity owns the
+event lifecycle.
+
+For a local visual preview, open
+`?debug=1&mockCalendar=1`. The mock uses the same entity shape as Home Assistant
+and is disabled on ordinary kiosk URLs.
+
+### Home Assistant dashboards (per profile)
+
+Each display can show a native control dashboard for its room, backed by your
+Home Assistant instance.
+
+**On the display (per device):** open Settings → enter your **Home Assistant
+URL** (e.g. `https://ha.local:8123`) and a **long-lived access token**
+(HA → your profile → Security → Long-lived access tokens → Create). Tap
+**Connect**. The token is stored only on that device and never uploaded.
+
+> Create a **dedicated Home Assistant user** for displays and generate the token
+> as that user — a long-lived token inherits its user's permissions, so this
+> scopes the display's blast radius.
+
+**Define a dashboard (admin):** in `admin.html` → *Profile dashboards*, pick a
+profile and enter a JSON array of tiles:
+
+- `sensor` — `{ "type": "sensor", "entity": "sensor.guest_temp", "unit": "°C" }`
+- `toggle` — `{ "type": "toggle", "entity": "light.guest", "label": "Ceiling", "icon": "💡" }`
+- `scene`/`button` — `{ "type": "scene", "service": "scene.turn_on", "target": "scene.night", "label": "Night" }`
+- `climate` — `{ "type": "climate", "entity": "climate.guest", "label": "Heat" }` (tap left/right to nudge the setpoint)
+- `status` — read-only; maps a numeric sensor value to a status label via
+  thresholds (the tile that exceeds the highest matching `above` wins, else
+  `default`):
+  ```json
+  { "type": "status", "entity": "sensor.dishwasher_power", "label": "Dishwasher", "unit": "W",
+    "thresholds": [ { "above": 10, "text": "Running", "icon": "🟢" } ],
+    "default": { "text": "Idle", "icon": "⚪" } }
+  ```
+  Useful for power → Running/Idle, CO₂ → Good/Elevated/High, etc.
+
+The **Dashboard** button appears on a display only when HA is connected and the
+device's active Profile has a dashboard defined.
+
+**Home Assistant configuration (required):**
+
+- **CORS** — add the clock's origin to `http.cors_allowed_origins` in HA's
+  `configuration.yaml`:
+  ```yaml
+  http:
+    cors_allowed_origins:
+      - https://clock.example.com
+  ```
+- **HTTPS/WSS** — if the clock is served over HTTPS, HA must be reachable over
+  HTTPS (`wss://…/api/websocket`) or the browser blocks the connection
+  (mixed content).
 
 ### Custom profiles
 
@@ -367,6 +450,42 @@ photo of whoever walks up. Both are **opt-in and off by default**, and need
   30 days / 1000 per room (`SNAPSHOT_RETENTION_DAYS`, `SNAPSHOT_MAX_PER_ROOM`),
   1 MiB per-image cap (`SNAPSHOT_MAX_BYTES`).
 
+### Logs and admin-state persistence
+
+**Logs are bounded.** Both services set `logging: json-file` with
+`max-size: "10m"` / `max-file: "3"`, so each container keeps at most ~30 MiB and
+Docker deletes old segments itself. Before this, one continuously-open kiosk
+(~28 access-log lines/minute) grew the clock log to **674 MB in 14 days**.
+
+**nginx logs conditionally, not blindly.** `nginx.conf` uses a `map` chain to
+drop *only* successful `GET`s of the four hot polling paths — `/alerts.json`,
+`/announce.json`, `/profiles.json`, `/source.json`. The match is on `$uri`
+(query string already stripped), so `?ts=…` cannot defeat it. Still logged:
+every non-2xx (404 / 401 / 429 / 5xx), every `PUT`/`DELETE`, every other route,
+and nginx errors at `warn` and above. There is no `access_log off` anywhere.
+
+**`/data` is a named volume (`clockdata`).** It holds all admin state —
+`announce.json`, `profiles.json`, `source.json`, `dashboards.json`, `uploads/`.
+It used to live in the container's writable layer, so every
+`docker compose up -d --build` silently discarded announcements, custom
+profiles, the source selection and dashboards.
+
+> **One-time migration for an existing deployment.** Adding the volume to a
+> container that already has state does *not* copy that state in — back it up
+> and restore it, or you lose it. See *Updating a deployed container* below.
+
+Missing files are seeded on start by `docker-entrypoint.d/05-data-init.sh`
+(`[]`, `{"profiles":[]}`, `{}`, `{"version":1,"profiles":{}}`). It **never**
+overwrites an existing non-empty file. This is what stopped the continuous
+`/source.json` 404 stream.
+
+Run the integration test for all of the above (needs Docker):
+
+```bash
+npm test               # unit tests
+npm run test:integration
+```
+
 ### Updating a deployed container
 
 The image is built from source (no published registry image), so update = pull + rebuild on the
@@ -391,15 +510,57 @@ Verify it landed:
 docker compose ps                 # container Up, recreated
 git log --oneline -1              # matches GitHub HEAD
 curl -s localhost:8080/config.json
+# logging is per-container and only applies after recreation — check the real thing:
+docker inspect -f '{{.HostConfig.LogConfig}}' clock-pwa clock-alert-sidecar
 ```
+
+#### One-time migration: moving `/data` onto the `clockdata` volume
+
+Only needed the first time you deploy the `clockdata` volume onto a container
+that already holds admin state. **Do this before recreating the container** —
+a fresh named volume is seeded from the *image*, not from the old container.
+
+```bash
+cd clock-pwa
+
+# 1. Back up the live /data out of the running container.
+docker cp clock-pwa:/data ./data-backup-$(date +%F)
+tar czf data-backup-$(date +%F).tgz -C . data-backup-$(date +%F)
+
+# 2. Pull + recreate (creates the empty clockdata volume).
+git pull
+docker compose up -d --build
+
+# 3. Restore the operator state into the volume, then restart.
+docker cp ./data-backup-$(date +%F)/. clock-pwa:/data
+docker exec clock-pwa chown -R nginx:nginx /data
+docker compose restart clock
+
+# 4. Verify nothing was lost.
+curl -s localhost:8080/announce.json
+curl -s localhost:8080/profiles.json
+curl -s localhost:8080/dashboards.json
+curl -s localhost:8080/source.json      # {} on a fresh install, never a 404
+```
+
+**Rollback.** Drop the `clockdata:/data` line (and the `clockdata:` entry under
+`volumes:`) from `docker-compose.yml`, `docker compose up -d --force-recreate
+clock`, then `docker cp ./data-backup-<date>/. clock-pwa:/data` and restart.
+The tarball from step 1 is the authoritative copy either way; keep it until
+you have verified step 4.
 
 Notes:
 - **Keep your location out of the tracked compose file** so `git pull` never conflicts. Put your
   `CLOCK_LAT/CLOCK_LON/CLOCK_CITY` in a **`.env`** file or a **`docker-compose.override.yml`**
   (both are auto-loaded by compose and aren't overwritten by pulls). If you did edit
   `docker-compose.yml` directly, use `git stash` → `git pull` → `git stash pop`.
-- **Client devices** (phones/TVs already open) cache via the service worker. After redeploy each
-  device needs **one reload** to pick up the new versioned SW; future loads update automatically.
+- **Client devices** (phones/TVs already open) reload themselves after a redeploy. The container
+  stamps `/version.json` (a content hash of the files the browser runs) at start; every device polls
+  it with its normal ~15 s announcement poll and, when the hash changes, reloads within ~30 s
+  (jittered so a fleet doesn't hit the server at once) — but only while idle, never mid-touch.
+  A rebuild with no file changes keeps the same hash and reloads nothing. Devices still running a
+  build from *before* this feature can't do this, so they need **one manual reload** the first
+  time; every deploy after that refreshes them automatically.
 
 ---
 
